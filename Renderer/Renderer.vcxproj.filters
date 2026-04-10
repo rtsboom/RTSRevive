@@ -1,0 +1,57 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="TinyGltfImpl.cpp" />
+    <ClCompile Include="GltfLoader.cpp" />
+    <ClCompile Include="MeshGenerator.cpp" />
+    <ClCompile Include="Pipeline.cpp" />
+    <ClCompile Include="RenderPass.cpp" />
+    <ClCompile Include="ConstantBuffer.cpp" />
+    <ClCompile Include="InstanceBuffer.cpp" />
+    <ClCompile Include="GpuMesh.cpp" />
+    <ClCompile Include="GpuUploader.cpp" />
+    <ClCompile Include="GpuUploadBuffer.cpp" />
+    <ClCompile Include="GpuFence.cpp" />
+    <ClCompile Include="GpuEvent.cpp" />
+    <ClCompile Include="GpuTextureRegistry.cpp" />
+    <ClCompile Include="ResourceManager.cpp" />
+    <ClCompile Include="GpuBuffer.cpp" />
+    <ClCompile Include="GpuTexture.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Renderer.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="GltfLoader.h" />
+    <ClInclude Include="MeshGenerator.h" />
+    <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Pipeline.h" />
+    <ClInclude Include="RenderPass.h" />
+    <ClInclude Include="DxUtils.h" />
+    <ClInclude Include="RenderConfig.h" />
+    <ClInclude Include="PathUtils.h" />
+    <ClInclude Include="ConstantBuffer.h" />
+    <ClInclude Include="InstanceBuffer.h" />
+    <ClInclude Include="GpuMesh.h" />
+    <ClInclude Include="GpuUploader.h" />
+    <ClInclude Include="GpuUploadBuffer.h" />
+    <ClInclude Include="GpuFence.h" />
+    <ClInclude Include="GpuEvent.h" />
+    <ClInclude Include="GpuTextureRegistry.h" />
+    <ClInclude Include="ResourceManager.h" />
+    <ClInclude Include="GpuBuffer.h" />
+    <ClInclude Include="RenderTypes.h" />
+    <ClInclude Include="GpuTexture.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+    <None Include="Common.hlsli" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="StaticMeshVS.hlsl" />
+    <FxCompile Include="StaticMeshPS.hlsl" />
+    <FxCompile Include="TriangleVS.hlsl" />
+    <FxCompile Include="TrianglePS.hlsl" />
+  </ItemGroup>
+</Project>

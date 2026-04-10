@@ -1,0 +1,9 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="AssetManager/AssetManager.vcxproj" Id="4bf5fabd-e537-4ef9-96e3-558157e779d1" />
+  <Project Path="Common/Common.vcxproj" Id="0070c381-f3c5-4066-9f1d-a44c68de1afa" />
+  <Project Path="Game/Game.vcxproj" Id="feca480e-0d62-4832-a9fd-bb8b2f0b692f" />
+  <Project Path="Renderer/Renderer.vcxproj" Id="25406306-ae71-4659-a28c-41d5f0018093" />
+</Solution>
