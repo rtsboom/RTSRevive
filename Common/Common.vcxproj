@@ -141,6 +141,7 @@
   <ItemGroup>
     <ClInclude Include="AssetTypes.h" />
     <ClInclude Include="CastUtils.h" />
+    <ClInclude Include="Handle.h" />
     <ClInclude Include="MathUtils.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="SpinLock.h" />

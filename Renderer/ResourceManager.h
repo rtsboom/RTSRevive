@@ -19,8 +19,6 @@ namespace rrv
 		ResourceManager() = default;
 		ResourceManager(ID3D12Device5* device, GpuUploader* uploader);
 
-		uint32_t AddModelFromGLTF(std::string fileName);
-
 	private:
 		ID3D12Device5* m_device = nullptr;
 		GpuUploader* m_uploader = nullptr;

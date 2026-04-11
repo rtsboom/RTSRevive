@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "ResourceManager.h"
-#include "GltfLoader.h"
 #include "DxUtils.h"
 namespace rrv
 {
@@ -9,7 +8,7 @@ namespace rrv
 		m_device = device;
 		m_uploader = uploader;
 	}
-
+	/*
 	uint32_t ResourceManager::AddModelFromGLTF(std::string fileName)
 	{
 		GltfLoader::Context ctx = GltfLoader::Load(fileName);
@@ -82,4 +81,5 @@ namespace rrv
 		m_models.push_back(std::move(ctx.model));
 		return u32(m_models.size() - 1);
 	}
+	*/
 }

@@ -35,27 +35,51 @@ namespace rrv::GLTFLoader
 	{
 		auto* ctx = static_cast<Context*>(userData);
 
-		ScratchImage scratch;
-		HRESULT hr;
-
+		uint32_t global_image_idx;
 		if (bytes)
 		{
-			hr = DirectX::LoadFromWICMemory(bytes, size, DirectX::WIC_FLAGS_NONE, nullptr, scratch);
+			ScratchImage scratch;
+			HRESULT hr = DirectX::LoadFromWICMemory(bytes, size, DirectX::WIC_FLAGS_NONE, nullptr, scratch);
+			if (FAILED(hr))
+			{
+				if (err) *err = "Failed to load image: " + image->uri;
+				return false;
+			}
+			global_image_idx = ctx->image_path_cache->size();
+			ctx->image_path_cache->emplace(image->uri, global_image_idx);
+
+			*image = {};
+			ctx->scratch_images.push_back(std::move(scratch));
+		}
+		else if (auto it = ctx->image_path_cache->find(image->uri); it != ctx->image_path_cache->end())
+		{
+			global_image_idx = it->second;
 		}
 		else
 		{
 			std::wstring image_path(image->uri.begin(), image->uri.end());
-			hr = DirectX::LoadFromWICFile(image_path.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, scratch);
+
+			ScratchImage scratch;
+			HRESULT hr = DirectX::LoadFromWICFile(image_path.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, scratch);
+			if (FAILED(hr))
+			{
+				if (err) *err = "Failed to load image: " + image->uri;
+				return false;
+			}
+			global_image_idx = ctx->image_path_cache->size();
+			ctx->image_path_cache->emplace(image->uri, global_image_idx);
+
+			*image = {};
+			ctx->scratch_images.push_back(std::move(scratch));
 		}
 
-		if (FAILED(hr))
+		
+		if (ctx->image_idx_local_to_global.size() <= imageIndex)
 		{
-			if (err) *err = "Failed to load image: " + image->uri;
-			return false;
+			ctx->image_idx_local_to_global.resize(imageIndex + 1);
 		}
+		ctx->image_idx_local_to_global[imageIndex] = global_image_idx;
 
-		*image = {};
-		ctx->scratch_images.push_back(std::move(scratch));
 		return true;
 	}
 
@@ -154,7 +178,7 @@ namespace rrv::GLTFLoader
 			* tinygltf::GetNumComponentsInType(accessor.type);
 	}
 
-	static uint64_t ComputeGeometryDataSizeInBytes(tinygltf::Model const& gltf)
+	static uint64_t ComputeGeometryDataSize(tinygltf::Model const& gltf)
 	{
 		uint64_t geometry_data_size = 0;
 		for (auto& gltf_mesh : gltf.meshes)
@@ -179,9 +203,10 @@ namespace rrv::GLTFLoader
 	}
 
 
-	Context Load(std::string_view path)
+	Context Load(std::string_view path, ImagePathCache& image_path_cache)
 	{
 		Context ctx;
+		ctx.image_path_cache = &image_path_cache;
 
 		tinygltf::Model	gltf;
 		tinygltf::TinyGLTF loader;
@@ -211,7 +236,7 @@ namespace rrv::GLTFLoader
 		ctx.model.geometries.reserve(primitive_count);
 		ctx.model.materials.reserve(primitive_count);
 
-		const uint64_t geometry_data_size = ComputeGeometryDataSizeInBytes(gltf);
+		const uint64_t geometry_data_size = ComputeGeometryDataSize(gltf);
 		ctx.geometry_data.reserve(geometry_data_size);
 
 
@@ -290,7 +315,7 @@ namespace rrv::GLTFLoader
 
 		for (int node_idx = 0; node_idx < gltf.nodes.size(); ++node_idx)
 		{
-			auto const& node  = gltf.nodes[node_idx];
+			auto const& node = gltf.nodes[node_idx];
 			if (node.mesh < 0) continue;
 
 			Asset::RenderItem item = {};

@@ -3,8 +3,6 @@
   <ItemGroup>
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="pch.cpp" />
-    <ClCompile Include="TinyGltfImpl.cpp" />
-    <ClCompile Include="GltfLoader.cpp" />
     <ClCompile Include="MeshGenerator.cpp" />
     <ClCompile Include="Pipeline.cpp" />
     <ClCompile Include="RenderPass.cpp" />
@@ -23,7 +21,6 @@
   <ItemGroup>
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="GltfLoader.h" />
     <ClInclude Include="MeshGenerator.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Pipeline.h" />
@@ -51,7 +48,5 @@
   <ItemGroup>
     <FxCompile Include="StaticMeshVS.hlsl" />
     <FxCompile Include="StaticMeshPS.hlsl" />
-    <FxCompile Include="TriangleVS.hlsl" />
-    <FxCompile Include="TrianglePS.hlsl" />
   </ItemGroup>
 </Project>

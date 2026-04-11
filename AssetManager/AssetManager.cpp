@@ -1,20 +1,25 @@
 #include "pch.h"
 #include "AssetManager.h"
 #include "GLTFLoader.h"
+#include <unordered_map>
+#include <string>
 namespace rrv
 {
+	using ImagePathCache = std::unordered_map<std::string, uint32_t>;
 	struct AssetManagerImpl
 	{
 		Renderer* m_renderer = nullptr;
 		uint32_t m_model_count = 0;
+		uint32_t m_image_count = 0;
+		ImagePathCache m_image_path_cache;
 
-
+	public:
 		uint32_t LoadModelFromGLTF(std::string_view path);
 	};
 
 	uint32_t AssetManagerImpl::LoadModelFromGLTF(std::string_view path)
 	{
-		GLTFLoader::Context ctx = GLTFLoader::Load(path);
+		GLTFLoader::Context ctx = GLTFLoader::Load(path, m_image_path_cache);
 
 		// Matrix Z Flip
 		for (size_t i = 0; i < ctx.world_matrices.size(); ++i)
