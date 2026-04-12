@@ -8,4 +8,5 @@
   <Project Path="Game/Game.vcxproj" Id="feca480e-0d62-4832-a9fd-bb8b2f0b692f" />
   <Project Path="Renderer/Renderer.vcxproj" Id="25406306-ae71-4659-a28c-41d5f0018093" />
   <Project Path="RTSRevive/RTSRevive.vcxproj" Id="59017cc9-d0e3-4648-95c5-1c4df7e1569e" />
+  <Project Path="Shared/Shared.vcxitems" Id="b6460176-e680-4d71-8ba4-46f7046f1505" />
 </Solution>

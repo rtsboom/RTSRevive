@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "Renderer.h"
-#include "GltfLoader.h"
 #include "DxUtils.h"
 
 #include "RenderConfig.h"
@@ -315,12 +314,13 @@ namespace rrv
 	void Renderer::SetCamera(rrv::Vec3 eyePos, rrv::Vec3 focusPos)
 	{
 		auto& d = *m_impl;
-		XMVECTOR xmEyePos = XMVectorSet(eyePos.x, eyePos.y, eyePos.z, 1.0f);
-		XMVECTOR xmFocusPos = XMVectorSet(focusPos.x, focusPos.y, focusPos.z, 1.0f);
-		XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+		XMVECTOR xmEyePos = DirectX::XMVectorSet(eyePos.x, eyePos.y, eyePos.z, 1.0f);
+		XMVECTOR xmFocusPos = DirectX::XMVectorSet(focusPos.x, focusPos.y, focusPos.z, 1.0f);
+		XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
 		auto& perFrameCBData = d.frameCBuffer[d.frameIndex];
-		XMStoreFloat4x4(&perFrameCBData.view, XMMatrixTranspose(XMMatrixLookAtLH(xmEyePos, xmFocusPos, up)));
+		XMStoreFloat4x4(&perFrameCBData.view, DirectX::XMMatrixTranspose(
+			DirectX::XMMatrixLookAtLH(xmEyePos, xmFocusPos, up)));
 	}
 
 	void Renderer::Render()
@@ -372,13 +372,13 @@ namespace rrv
 
 		XMFLOAT3 lightDir = { 0.5f, -1.0f, 0.5f };
 		// normalize light direction
-		XMVECTOR ld = XMVector3Normalize(XMLoadFloat3(&lightDir));
+		XMVECTOR ld = DirectX::XMVector3Normalize(XMLoadFloat3(&lightDir));
 		XMStoreFloat3(&perFrameCBData.lightDir, ld);
 
 		// Projection matrix
 		float aspectRatio = (float)d.width / (float)d.height;
-		XMStoreFloat4x4(&perFrameCBData.proj, XMMatrixTranspose(
-			XMMatrixPerspectiveFovLH(XMConvertToRadians(60.0f), aspectRatio, 0.1f, 1000.0f)));
+		XMStoreFloat4x4(&perFrameCBData.proj, DirectX::XMMatrixTranspose(
+			DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(60.0f), aspectRatio, 0.1f, 1000.0f)));
 
 		memcpy(frameResource.constantBufSlice.mapped, &perFrameCBData, sizeof(perFrameCBData));
 
@@ -439,9 +439,9 @@ namespace rrv
 			for (uint32_t j = 0; j < 10; ++j)
 			{
 				InstanceData data = {};
-				XMMATRIX world = XMMatrixScaling(0.1f, 0.1f, 0.1f)
-					* XMMatrixRotationY(angle)
-					* XMMatrixTranslation(i * 20.0f, 0.0f, j * 20.0f);
+				XMMATRIX world = DirectX::XMMatrixScaling(0.1f, 0.1f, 0.1f)
+					* DirectX::XMMatrixRotationY(angle)
+					* DirectX::XMMatrixTranslation(i * 20.0f, 0.0f, j * 20.0f);
 
 				XMStoreFloat4x4(&data.world, XMMatrixTranspose(world));
 

@@ -4,11 +4,21 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Gpu\GpuCore.cpp" />
-    <ClCompile Include="Gpu\pch.cpp" />
+    <ClCompile Include="EnginePch.cpp" />
+    <ClCompile Include="GraphicsDevice.cpp">
+      <Filter>Gfx</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Gpu\GpuCore.h" />
-    <ClInclude Include="Gpu\pch.h" />
+    <ClInclude Include="EnginePch.h" />
+    <ClInclude Include="SimpleEvent.h" />
+    <ClInclude Include="GraphicsDevice.h">
+      <Filter>Gfx</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Gfx">
+      <UniqueIdentifier>{bf1c35ec-30bd-40ba-8d57-606f65a877a0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>

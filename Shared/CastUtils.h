@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace rrv
+namespace rr
 {
 	template<typename T> constexpr uint64_t u64(T v) noexcept { return static_cast<uint64_t>(v); }
 	template<typename T> constexpr uint32_t u32(T v) noexcept { return static_cast<uint32_t>(v); }

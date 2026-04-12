@@ -8,7 +8,7 @@
 #include <memory>
 
 
-std::unique_ptr<rrv::Application> g_app;
+std::unique_ptr<rr::Application> g_app;
 
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
@@ -48,7 +48,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	if (!h_window) return 1;
 	ShowWindow(h_window, SW_SHOW);
 	GetClientRect(h_window, &rc); // Get the actual client area size
-	g_app = std::make_unique<rrv::Application>(h_window, rc.right - rc.left, rc.bottom - rc.top);
+	g_app = std::make_unique<rr::Application>(h_window, rc.right - rc.left, rc.bottom - rc.top);
 
 	MSG msg = {};
 	while (WM_QUIT != msg.message)
@@ -74,7 +74,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
-	using namespace rrv;
+	using namespace rr;
 
 	switch (msg)
 	{
@@ -85,6 +85,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 			return 0;
 		}
 		break;
+
+	case WM_SIZE:
+	{
+		if (wparam == SIZE_MINIMIZED) break;
+		const uint32_t width = LOWORD(lparam);
+		const uint32_t height = HIWORD(lparam);
+		if (width == 0 || height == 0) break;
+		if (g_app) g_app->OnWindowResize(width, height);
+	}
+	break;
 
 	case WM_CLOSE:
 		PostQuitMessage(0);
