@@ -66,7 +66,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 	g_app.reset();
 	DestroyWindow(h_window);
-	UnregisterClass(wc.lpszClassName, wc.hInstance);
+	UnregisterClassW(wc.lpszClassName, wc.hInstance);
 	CoUninitialize();
 
 	return static_cast<int>(msg.wParam);

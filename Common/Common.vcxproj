@@ -139,7 +139,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="AssetTypes.h" />
     <ClInclude Include="CastUtils.h" />
     <ClInclude Include="Handle.h" />
     <ClInclude Include="MathUtils.h" />

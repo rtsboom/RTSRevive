@@ -15,6 +15,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(MSBuildThisFileDirectory)CastUtils.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)MathUtils.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)RR_Framework.h" />
   </ItemGroup>
 </Project>

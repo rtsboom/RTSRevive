@@ -3,7 +3,7 @@
 #include <DirectXMath.h> // Windows SDK
 #include <DirectXTex.h>  // DirectXTex Nuget Pakage
 
-namespace rrv
+namespace rr
 {
 	// DirectXMath
 	using DirectX::XMFLOAT2;
@@ -26,7 +26,7 @@ namespace rrv
 }
 
 
-#include <Common/CastUtils.h>
-#include <Common/MathUtils.h>
+#include <CastUtils.h>
+#include <MathUtils.h>
 
 #include <cstdint>

@@ -5,7 +5,6 @@
     <ClInclude Include="MathUtils.h" />
     <ClInclude Include="SpinLock.h" />
     <ClInclude Include="CastUtils.h" />
-    <ClInclude Include="AssetTypes.h" />
     <ClInclude Include="Handle.h" />
   </ItemGroup>
   <ItemGroup>

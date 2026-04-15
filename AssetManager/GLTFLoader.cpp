@@ -1,86 +1,45 @@
 #include "pch.h"
 #include "GLTFLoader.h"
+#include <MathUtils.h>
+
 
 #define TINYGLTF_NO_STB_IMAGE
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 #define TINYGLTF_IMPLEMENTATION
 #include <tinygltf/tiny_gltf.h>
 
+#include <filesystem>
 
-namespace rrv::GLTFLoader
+
+namespace rr::ModelLoader
 {
-	static int GetPrimitiveAccessor(Asset::Geometry::BufferSlot slot, tinygltf::Primitive primitive)
+
+	static int GetAccessor(tinygltf::Primitive primitive)
 	{
-		if (slot == Asset::Geometry::BufferSlot::INDEX)
-			return primitive.indices;
-
-		const auto it = primitive.attributes.find(
-			Asset::Geometry::attribute_names[u64(slot)]);
-
-		if (it != primitive.attributes.end())
-			return it->second;
 
 		return -1;
 	}
 
-	static int GetPrimitiveAccessor(int slot, tinygltf::Primitive primitive)
+	static int GetPrimitivePosition(tinygltf::Primitive primitive)
 	{
-		return GetPrimitiveAccessor(static_cast<Asset::Geometry::BufferSlot>(slot), primitive);
+		const auto it = primitive.attributes.find("POSITION");
+		if (it != primitive.attributes.end()) return it->second;
+
+		return -1;
 	}
 
-	static bool LoadImageDirectXTex(tinygltf::Image* image, const int imageIndex,
-		std::string* err, std::string* warn,
-		int reqWidth, int reqHeight,
-		const unsigned char* bytes, int size, void* userData)
+	static int GetPrimitiveNormal(tinygltf::Primitive primitive)
 	{
-		auto* ctx = static_cast<Context*>(userData);
+		const auto it = primitive.attributes.find("NORMAL");
+		if (it != primitive.attributes.end()) return it->second;
+		return -1;
+	}
 
-		uint32_t global_image_idx;
-		if (bytes)
-		{
-			ScratchImage scratch;
-			HRESULT hr = DirectX::LoadFromWICMemory(bytes, size, DirectX::WIC_FLAGS_NONE, nullptr, scratch);
-			if (FAILED(hr))
-			{
-				if (err) *err = "Failed to load image: " + image->uri;
-				return false;
-			}
-			global_image_idx = ctx->image_path_cache->size();
-			ctx->image_path_cache->emplace(image->uri, global_image_idx);
-
-			*image = {};
-			ctx->scratch_images.push_back(std::move(scratch));
-		}
-		else if (auto it = ctx->image_path_cache->find(image->uri); it != ctx->image_path_cache->end())
-		{
-			global_image_idx = it->second;
-		}
-		else
-		{
-			std::wstring image_path(image->uri.begin(), image->uri.end());
-
-			ScratchImage scratch;
-			HRESULT hr = DirectX::LoadFromWICFile(image_path.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, scratch);
-			if (FAILED(hr))
-			{
-				if (err) *err = "Failed to load image: " + image->uri;
-				return false;
-			}
-			global_image_idx = ctx->image_path_cache->size();
-			ctx->image_path_cache->emplace(image->uri, global_image_idx);
-
-			*image = {};
-			ctx->scratch_images.push_back(std::move(scratch));
-		}
-
-		
-		if (ctx->image_idx_local_to_global.size() <= imageIndex)
-		{
-			ctx->image_idx_local_to_global.resize(imageIndex + 1);
-		}
-		ctx->image_idx_local_to_global[imageIndex] = global_image_idx;
-
-		return true;
+	static int GetPrimitiveUV(tinygltf::Primitive primitive)
+	{
+		const auto it = primitive.attributes.find("TEXCOORD_0");
+		if (it != primitive.attributes.end()) return it->second;
+		return -1;
 	}
 
 	static XMMATRIX GetLocalMatrix(tinygltf::Node const& node)
@@ -172,120 +131,142 @@ namespace rrv::GLTFLoader
 		return out_matrices;
 	}
 
-	static int GetAccessorElementSize(tinygltf::Accessor const& accessor)
+	static int GetElementSize(tinygltf::Accessor const& accessor)
 	{
 		return tinygltf::GetComponentSizeInBytes(accessor.componentType)
 			* tinygltf::GetNumComponentsInType(accessor.type);
 	}
 
-	static uint64_t ComputeGeometryDataSize(tinygltf::Model const& gltf)
+	Context LoadFromGLTF(std::string_view path)
 	{
-		uint64_t geometry_data_size = 0;
-		for (auto& gltf_mesh : gltf.meshes)
-		{
-			for (auto& primitive : gltf_mesh.primitives)
-			{
-				for (int slot = 0; slot < i32(Asset::Geometry::BufferSlot::COUNT); ++slot)
-				{
-					const int acc_idx = GetPrimitiveAccessor(slot, primitive);
-					if (acc_idx == -1) continue;
-
-					auto& acc = gltf.accessors[acc_idx];
-					const int elem_size = GetAccessorElementSize(acc);
-
-					geometry_data_size += acc.count * elem_size;
-					geometry_data_size = rrv::AlignUp(geometry_data_size, 4u);
-				}
-			}
-		}
-
-		return geometry_data_size;
-	}
-
-
-	Context Load(std::string_view path, ImagePathCache& image_path_cache)
-	{
-		Context ctx;
-		ctx.image_path_cache = &image_path_cache;
-
 		tinygltf::Model	gltf;
-		tinygltf::TinyGLTF loader;
+		tinygltf::TinyGLTF gltf_loader;
 		std::string err, warn;
-		loader.SetImageLoader(LoadImageDirectXTex, &ctx);
-
-		bool ret = loader.LoadASCIIFromFile(&gltf, &err, &warn, std::string(path));
+		bool ret = gltf_loader.LoadASCIIFromFile(&gltf, &err, &warn, std::string(path));
 		if (!warn.empty()) OutputDebugStringA(warn.c_str());
 		if (!err.empty())  OutputDebugStringA(err.c_str());
 		if (!ret) return {};
 
-		ctx.world_matrices = ComputeWorldMatrices(gltf);
+		Context ctx = {};
 
-		ctx.model.meshes.reserve(gltf.meshes.size());
-
-		uint32_t primitive_count = 0;
-		for (auto const& gltf_mesh : gltf.meshes)
+		// staging image data; either embedded or file paths.
+		ctx.staging_images.reserve(gltf.images.size());
+		for (auto const& image : gltf.images)
 		{
-			Asset::Mesh mesh = {};
-			mesh.start = primitive_count;
-			mesh.count = u32(gltf_mesh.primitives.size());
-			ctx.model.meshes.push_back(mesh);
+			StagingImage staging_image = {};
 
-			primitive_count += mesh.count;
+			if (image.bufferView != -1)
+			{
+				auto const& view = gltf.bufferViews[image.bufferView];
+				auto const& buf = gltf.buffers[view.buffer];
+				staging_image.src.assign(
+					reinterpret_cast<const char*>(buf.data.data() + view.byteOffset),
+					view.byteLength);
+
+				staging_image.is_embedded = true;
+			}
+			else if (image.uri.rfind("data:", 0) == 0)
+			{
+				size_t comma_pos = image.uri.find(',');
+				staging_image.src = image.uri.substr(comma_pos + 1);
+				staging_image.is_embedded = true;
+			}
+			else
+			{
+				std::filesystem::path gltf_base_dir = std::filesystem::path(path).parent_path();
+				std::filesystem::path image_path = gltf_base_dir / image.uri;
+				staging_image.src = image_path.string();
+			}
+			ctx.staging_images.push_back(std::move(staging_image));
 		}
 
-		ctx.model.geometries.reserve(primitive_count);
-		ctx.model.materials.reserve(primitive_count);
+		// Compute world matrices for all nodes in the scene.
+		ctx.world_matrices = ComputeWorldMatrices(gltf);
 
-		const uint64_t geometry_data_size = ComputeGeometryDataSize(gltf);
-		ctx.geometry_data.reserve(geometry_data_size);
 
+		size_t primitive_count = 0;
+		std::vector<uint32_t> flatten_mesh_offsets;
+		flatten_mesh_offsets.reserve(gltf.meshes.size());
+
+		for (auto const& gltf_mesh : gltf.meshes)
+		{
+			flatten_mesh_offsets.push_back(u32(primitive_count));
+			primitive_count += gltf_mesh.primitives.size();
+		}
+		ctx.model.meshes.reserve(primitive_count);
+		ctx.staging_buffer.reserve(64 * 1024);
+
+		std::vector<int> acc_to_mesh_view(gltf.accessors.size(), -1);
+		std::vector<rr::ByteSpan> mesh_views;
+		mesh_views.reserve(gltf.accessors.size());
 
 		for (auto const& gltf_mesh : gltf.meshes)
 		{
 			for (auto const& primitive : gltf_mesh.primitives)
 			{
-				Asset::Geometry geometry = {};
+				int acc_idxs[u32(Asset::Mesh::View::COUNT)];
+				std::fill_n(acc_idxs, _countof(acc_idxs), -1);
+				acc_idxs[u32(Asset::Mesh::View::POSITION)] = GetPrimitivePosition(primitive);
+				acc_idxs[u32(Asset::Mesh::View::NORMAL)] = GetPrimitiveNormal(primitive);
+				acc_idxs[u32(Asset::Mesh::View::UV)] = GetPrimitiveUV(primitive);
+				acc_idxs[u32(Asset::Mesh::View::INDEX)] = primitive.indices;
+
+
+				Asset::Mesh flatten_mesh = {};
 
 				if (primitive.indices != -1)
 				{
-					geometry.index_count = u32(gltf.accessors[primitive.indices].count);
+					flatten_mesh.index_count = u32(gltf.accessors[primitive.indices].count);
 				}
-				if (const int acc_idx = GetPrimitiveAccessor(
-					Asset::Geometry::BufferSlot::POSITION, primitive);
-					acc_idx != -1)
+				if (const int pos_acc_idx = acc_idxs[u32(Asset::Mesh::View::POSITION)];
+					pos_acc_idx != -1)
 				{
-					geometry.vertex_count = gltf.accessors[acc_idx].count;
+					flatten_mesh.vertex_count = u32(gltf.accessors[pos_acc_idx].count);
 				}
 
-				// vertex attributes metadata
-				for (int slot = 0; slot < i32(Asset::Geometry::BufferSlot::COUNT); ++slot)
+				for (int slot = 0; slot < _countof(acc_idxs); ++slot)
 				{
-					const int acc_idx = GetPrimitiveAccessor(slot, primitive);
+					const int acc_idx = acc_idxs[slot];
 					if (acc_idx == -1) continue;
+
+					if (const int byte_span_idx = acc_to_mesh_view[acc_idx];
+						byte_span_idx != -1)
+					{
+						flatten_mesh.views[slot] = mesh_views[byte_span_idx];
+						continue;
+					}
+
 
 					auto const& acc = gltf.accessors[acc_idx];
 					auto const& view = gltf.bufferViews[acc.bufferView];
 					auto const& buf = gltf.buffers[view.buffer];
 					uint8_t const* base = buf.data.data() + view.byteOffset + acc.byteOffset;
 
-					const int elem_size = GetAccessorElementSize(acc);
+					const int elem_size = GetElementSize(acc);
 					const size_t stride = view.byteStride ? view.byteStride : elem_size;
 
-					geometry.views[slot].stride = u32(stride);
-					geometry.views[slot].offset = u32(ctx.geometry_data.size());
+					rr::ByteSpan mesh_view = {};
+					mesh_view.offset = u32(ctx.staging_buffer.size());
+					mesh_view.length = u32(acc.count * elem_size);
+					mesh_view.stride = u32(stride);
+					
+					acc_to_mesh_view[acc_idx] = i32(mesh_views.size());
+					mesh_views.push_back(mesh_view);
+
 					for (int i = 0; i < acc.count; ++i)
 					{
-						const uint8_t* elem_data = base + i * stride;
-						ctx.geometry_data.insert(ctx.geometry_data.end(), elem_data, elem_data + elem_size);
+						uint8_t const* elem_data = base + i * stride;
+						ctx.staging_buffer.insert(ctx.staging_buffer.end(), elem_data, elem_data + elem_size);
 					}
 
-					ctx.geometry_data.resize(rrv::AlignUp(ctx.geometry_data.size(), 4u));
+					ctx.staging_buffer.resize(rr::AlignUp<4>(ctx.staging_buffer.size()));
 				}
 
-				ctx.model.geometries.push_back(geometry);
+				ctx.model.meshes.push_back(flatten_mesh);
 			}
 		}
 
+		// Populate material metadata.
 		for (auto& gltf_mesh : gltf.meshes)
 		{
 			for (auto& primitive : gltf_mesh.primitives)
@@ -318,10 +299,14 @@ namespace rrv::GLTFLoader
 			auto const& node = gltf.nodes[node_idx];
 			if (node.mesh < 0) continue;
 
-			Asset::RenderItem item = {};
-			item.mesh_idx = node.mesh;
-			item.node_idx = node_idx;
-			ctx.model.render_items.push_back(item);
+			for (int mesh_idx = flatten_mesh_offsets[node.mesh];
+				mesh_idx < gltf.meshes[node.mesh].primitives.size(); ++mesh_idx)
+			{
+				Asset::MeshNode mesh_node = {};
+				mesh_node.mesh_idx = node.mesh;
+				mesh_node.node_idx = node_idx;
+				ctx.model.mesh_nodes.push_back(mesh_node);
+			}
 		}
 
 		return ctx;

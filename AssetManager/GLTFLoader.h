@@ -1,33 +1,34 @@
 #pragma once
 
-#include <Common/AssetTypes.h>
 #include <string_view>
 #include <string>
+#include "AssetUtils.h"
 
-
-namespace rrv
+namespace rr
 {
-	using ImagePathCache = std::unordered_map<std::string, uint32_t>;
+	using DirectX::XMFLOAT4X4;
+
+	struct StagingImage
+	{
+		std::string src;
+		bool is_embedded;
+	};
 }
-namespace rrv::GLTFLoader
+namespace rr::ModelLoader
 {
+
 	struct Context
 	{
 		Asset::Model model;
 
 		// CPU-side staging data; Ownership moves during upload
 		
-		std::vector<uint8_t>               geometry_data;
-		std::vector<DirectX::ScratchImage> scratch_images;
+		std::vector<uint8_t>      staging_buffer;
+		std::vector<StagingImage> staging_images;
 
-		// uploaded to GPU but also kept on CPU.
-		// on LH coordinate system.
+		// Uploaded to GPU but also kept on CPU; row major.
 		std::vector<XMFLOAT4X4> world_matrices;
-
-		std::vector<uint32_t> image_idx_local_to_global;
-		ImagePathCache* image_path_cache;
-
 	};
 
-	Context Load(std::string_view path, ImagePathCache& image_path_cache);
+	Context LoadFromGLTF(std::string_view path);
 }

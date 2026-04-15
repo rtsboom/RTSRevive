@@ -9,7 +9,7 @@ namespace rr
 	public:
 		SimpleEvent() = default;
 		explicit SimpleEvent(HANDLE handle) : m_handle(handle) {};
-		~SimpleEvent() 
+		~SimpleEvent()
 		{
 			if (m_handle) ::CloseHandle(m_handle);
 		}
@@ -18,16 +18,14 @@ namespace rr
 		SimpleEvent& operator=(SimpleEvent const&) = delete;
 		SimpleEvent(SimpleEvent&& other) noexcept
 		{
-			m_handle = std::exchange(other.m_handle,nullptr);
+			m_handle = std::exchange(other.m_handle, nullptr);
 		}
 
 		SimpleEvent& operator=(SimpleEvent&& other) noexcept
 		{
-			if (this != &other)
-			{
-				if (m_handle) ::CloseHandle(m_handle);
-				m_handle = std::exchange(other.m_handle, nullptr);
-			}
+			if (this == &other) return *this;
+			if (m_handle) ::CloseHandle(m_handle);
+			m_handle = std::exchange(other.m_handle, nullptr);
 			return *this;
 		}
 
