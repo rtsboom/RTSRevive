@@ -9,7 +9,7 @@ namespace rr
 {
 	using ModelHandle = uint32_t;    // Blender Scene
 	using MeshHandle = uint32_t;     // Blender Object
-	using MaterialHandle = uint32_t; // Blender Material
+	using MaterialHandle = uint32_t; // Blender MaterialAsset
 
 	using StagingBuffer = std::vector<uint8_t>;
 	using StagingTexture = DirectX::ScratchImage;

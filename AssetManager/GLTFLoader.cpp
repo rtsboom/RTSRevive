@@ -1,48 +1,28 @@
 #include "pch.h"
 #include "GLTFLoader.h"
-#include <MathUtils.h>
+#include "StagingModel.h"
+#include <CastUtils.h>
 
-
+#pragma warning(push, 0)
 #define TINYGLTF_NO_STB_IMAGE
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 #define TINYGLTF_IMPLEMENTATION
 #include <tinygltf/tiny_gltf.h>
+#pragma warning(pop)
 
+#include <DirectXMath.h>
+
+#include <Windows.h>
 #include <filesystem>
+#include <stdexcept>
+#include <string>
 
-
-namespace rr::ModelLoader
+namespace
 {
+	using namespace DirectX;
+	using namespace rr;
 
-	static int GetAccessor(tinygltf::Primitive primitive)
-	{
-
-		return -1;
-	}
-
-	static int GetPrimitivePosition(tinygltf::Primitive primitive)
-	{
-		const auto it = primitive.attributes.find("POSITION");
-		if (it != primitive.attributes.end()) return it->second;
-
-		return -1;
-	}
-
-	static int GetPrimitiveNormal(tinygltf::Primitive primitive)
-	{
-		const auto it = primitive.attributes.find("NORMAL");
-		if (it != primitive.attributes.end()) return it->second;
-		return -1;
-	}
-
-	static int GetPrimitiveUV(tinygltf::Primitive primitive)
-	{
-		const auto it = primitive.attributes.find("TEXCOORD_0");
-		if (it != primitive.attributes.end()) return it->second;
-		return -1;
-	}
-
-	static XMMATRIX GetLocalMatrix(tinygltf::Node const& node)
+	XMMATRIX GetLocalMatrix(tinygltf::Node const& node)
 	{
 		if (node.matrix.size() == 16)
 		{
@@ -86,7 +66,7 @@ namespace rr::ModelLoader
 		return m;
 	}
 
-	static std::vector<XMFLOAT4X4> ComputeWorldMatrices(tinygltf::Model const& gltf)
+	std::vector<XMFLOAT4X4> ComputeWorldTransforms(tinygltf::Model const& gltf)
 	{
 		const uint32_t node_count = u32(gltf.nodes.size());
 		std::vector<XMFLOAT4X4> out_matrices(node_count);
@@ -131,185 +111,523 @@ namespace rr::ModelLoader
 		return out_matrices;
 	}
 
-	static int GetElementSize(tinygltf::Accessor const& accessor)
+	int GetElementSizeInBytes(tinygltf::Accessor const& accessor)
 	{
 		return tinygltf::GetComponentSizeInBytes(accessor.componentType)
 			* tinygltf::GetNumComponentsInType(accessor.type);
 	}
 
-	Context LoadFromGLTF(std::string_view path)
+	struct GLTFLoader
 	{
-		tinygltf::Model	gltf;
+		tinygltf::Model	 gltf;
+		std::string_view gltf_path;
+
+		StagingModel m_model;
+
+		void Parse(std::string_view path);
+
+		void ProcessPrimitiveIndices();
+		void ProcessPrimitivePositions();
+		void ProcessPrimitiveNormals();
+		void ProcessPrimitiveTexCoords();
+		void ProcessPrimitiveMaterials();
+		void ProcessTextures();
+		void ProcessMaterials();
+		void ProcessMeshNodes();
+		void ProcessNodeTransforms();
+		void ConvertRhToLhPositions();
+		void ConvertRhToLhNormals();
+		void ConvertRhToLhTransforms();
+		void ConvertRhToLhIndices();
+	};
+
+
+	void GLTFLoader::Parse(std::string_view path)
+	{
+		gltf_path = path;
 		tinygltf::TinyGLTF gltf_loader;
 		std::string err, warn;
 		bool ret = gltf_loader.LoadASCIIFromFile(&gltf, &err, &warn, std::string(path));
 		if (!warn.empty()) OutputDebugStringA(warn.c_str());
 		if (!err.empty())  OutputDebugStringA(err.c_str());
-		if (!ret) return {};
+		if (!ret) throw std::runtime_error("Failed to load glTF file.");
 
-		Context ctx = {};
+		size_t total_primitive_count = 0;
+		m_model.m_meshes.reserve(gltf.meshes.size());
 
-		// staging image data; either embedded or file paths.
-		ctx.staging_images.reserve(gltf.images.size());
+		for (auto const& gltf_mesh : gltf.meshes)
+		{
+			StagingMesh mesh = {
+				.m_submesh_offset = u16(total_primitive_count),
+				.m_submesh_count = u16(gltf_mesh.primitives.size())
+			};
+			m_model.m_meshes.push_back(mesh);
+			total_primitive_count += gltf_mesh.primitives.size();
+		}
+
+		m_model.m_submeshes.resize(total_primitive_count);
+	}
+
+	void GLTFLoader::ProcessPrimitiveIndices()
+	{
+		std::vector<uint32_t> acc_cache(gltf.accessors.size(), -1);
+
+		size_t index_u32_count = 0;
+		size_t index_u16_count = 0;
+
+		for (int gltf_mesh_idx = 0; gltf_mesh_idx < gltf.meshes.size(); ++gltf_mesh_idx)
+		{
+			auto const& gltf_mesh = gltf.meshes[gltf_mesh_idx];
+			for (int gltf_prim_idx = 0; gltf_prim_idx < gltf_mesh.primitives.size(); ++gltf_prim_idx)
+			{
+				auto const& gltf_prim = gltf_mesh.primitives[gltf_prim_idx];
+
+				int acc_idx = gltf_prim.indices;
+				if (acc_idx < 0) continue;
+
+				auto const& acc = gltf.accessors[gltf_prim.indices];
+
+				const int submesh_idx = m_model.m_meshes[gltf_mesh_idx].m_submesh_offset + gltf_prim_idx;
+				auto& submesh = m_model.m_submeshes[submesh_idx];
+
+				if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+				{
+					if (acc_cache[acc_idx] == -1)
+					{
+						acc_cache[gltf_prim.indices] = u32(index_u32_count);
+						index_u32_count += acc.count;
+					}
+
+					submesh.m_index_count = u32(acc.count);
+					submesh.m_index_offset = u32(acc_cache[acc_idx]);
+					submesh.m_index_stride = u32(sizeof(uint32_t));
+				}
+				else
+				{
+					if (acc_cache[acc_idx] == -1)
+					{
+						acc_cache[gltf_prim.indices] = u32(index_u16_count);
+						index_u16_count += acc.count;
+					}
+
+					submesh.m_index_count = u32(acc.count);
+					submesh.m_index_offset = u32(acc_cache[acc_idx]);
+					submesh.m_index_stride = u32(sizeof(uint16_t));
+				}
+
+			}
+		}
+
+		m_model.m_indices_u32.resize(index_u32_count);
+		m_model.m_indices_u16.resize(index_u16_count);
+
+		for (size_t acc_idx = 0; acc_idx < acc_cache.size(); ++acc_idx)
+		{
+			const uint32_t offset = acc_cache[acc_idx];
+			if (offset == -1) continue;
+
+			auto const& acc = gltf.accessors[acc_idx];
+			auto const& view = gltf.bufferViews[acc.bufferView];
+			auto const& buf = gltf.buffers[view.buffer];
+			if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+			{
+				if (view.byteStride == 0)
+				{
+					std::memcpy(&m_model.m_indices_u32[offset],
+						buf.data.data() + view.byteOffset + acc.byteOffset,
+						acc.count * sizeof(uint32_t));
+					continue;
+				}
+				for (size_t i = 0; i < acc.count; ++i)
+				{
+					std::memcpy(
+						&m_model.m_indices_u32[offset + i],
+						buf.data.data() + view.byteOffset + acc.byteOffset + i * view.byteStride,
+						sizeof(uint32_t));
+				}
+			}
+			else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+			{
+				if (view.byteStride == 0)
+				{
+					std::memcpy(&m_model.m_indices_u16[offset],
+						buf.data.data() + view.byteOffset + acc.byteOffset,
+						acc.count * sizeof(uint16_t));
+					continue;
+				}
+				for (size_t i = 0; i < acc.count; ++i)
+				{
+					std::memcpy(
+						&m_model.m_indices_u16[offset + i],
+						buf.data.data() + view.byteOffset + acc.byteOffset + i * view.byteStride,
+						sizeof(uint16_t));
+				}
+			}
+			else // if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
+			{
+				size_t byte_stride = (view.byteStride != 0) ? view.byteStride : sizeof(uint8_t);
+				for (size_t i = 0; i < acc.count; ++i)
+				{
+					m_model.m_indices_u16[offset + i] = buf.data[view.byteOffset + acc.byteOffset + i * byte_stride];
+				}
+			}
+		}
+	}
+
+	void GLTFLoader::ProcessPrimitivePositions()
+	{
+		std::vector<uint32_t> acc_cache(gltf.accessors.size(), -1);
+
+		size_t position_count = 0;
+
+		for (size_t gltf_mesh_idx = 0; gltf_mesh_idx < gltf.meshes.size(); ++gltf_mesh_idx)
+		{
+			auto const& gltf_mesh = gltf.meshes[gltf_mesh_idx];
+			for (size_t gltf_prim_idx = 0; gltf_prim_idx < gltf_mesh.primitives.size(); ++gltf_prim_idx)
+			{
+				auto const& gltf_prim = gltf_mesh.primitives[gltf_prim_idx];
+				auto it = gltf_prim.attributes.find("POSITION");
+				if (it == gltf_prim.attributes.end()) continue;
+
+				int acc_idx = it->second;
+				auto const& acc = gltf.accessors[acc_idx];
+
+				const int submesh_idx = m_model.m_meshes[gltf_mesh_idx].m_submesh_offset + gltf_prim_idx;
+				auto& submesh = m_model.m_submeshes[submesh_idx];
+
+				if (acc_cache[acc_idx] == -1)
+				{
+					acc_cache[acc_idx] = u32(position_count);
+					position_count += acc.count;
+				}
+
+				submesh.m_vertex_count = u32(acc.count);
+				submesh.m_position_offset = u32(acc_cache[acc_idx]);
+			}
+		}
+
+		m_model.m_positions.resize(position_count);
+
+		for (size_t acc_idx = 0; acc_idx < gltf.accessors.size(); ++acc_idx)
+		{
+			const uint32_t offset = acc_cache[acc_idx];
+			if (offset == -1) continue;
+
+			auto const& acc = gltf.accessors[acc_idx];
+			auto const& view = gltf.bufferViews[acc.bufferView];
+			auto const& buf = gltf.buffers[view.buffer];
+
+			if (view.byteStride == 0)
+			{
+				std::memcpy(
+					&m_model.m_positions[offset],
+					buf.data.data() + view.byteOffset + acc.byteOffset,
+					acc.count * sizeof(XMFLOAT3));
+				continue;
+			}
+			for (size_t i = 0; i < acc.count; ++i)
+			{
+				std::memcpy(
+					&m_model.m_positions[offset + i],
+					buf.data.data() + view.byteOffset + acc.byteOffset + i * view.byteStride,
+					sizeof(XMFLOAT3));
+			}
+		}
+	}
+
+	void GLTFLoader::ProcessPrimitiveNormals()
+	{
+		std::vector<uint32_t> acc_cache(gltf.accessors.size(), -1);
+		size_t normal_count = 0;
+
+		for (size_t gltf_mesh_idx = 0; gltf_mesh_idx < gltf.meshes.size(); ++gltf_mesh_idx)
+		{
+			auto const& gltf_mesh = gltf.meshes[gltf_mesh_idx];
+			for (size_t gltf_prim_idx = 0; gltf_prim_idx < gltf_mesh.primitives.size(); ++gltf_prim_idx)
+			{
+				auto const& gltf_prim = gltf_mesh.primitives[gltf_prim_idx];
+				auto it = gltf_prim.attributes.find("NORMAL");
+				if (it == gltf_prim.attributes.end()) continue;
+
+				int acc_idx = it->second;
+				auto const& acc = gltf.accessors[acc_idx];
+
+				const int submesh_idx = m_model.m_meshes[gltf_mesh_idx].m_submesh_offset + gltf_prim_idx;
+				auto& submesh = m_model.m_submeshes[submesh_idx];
+
+				if (acc_cache[acc_idx] == -1)
+				{
+					acc_cache[acc_idx] = u32(normal_count);
+					normal_count += acc.count;
+				}
+
+				submesh.m_normal_offset = u32(acc_cache[acc_idx]);
+			}
+		}
+
+		m_model.m_normals.resize(normal_count);
+
+		for (size_t acc_idx = 0; acc_idx < gltf.accessors.size(); ++acc_idx)
+		{
+			const uint32_t offset = acc_cache[acc_idx];
+			if (offset == -1) continue;
+
+			auto const& acc = gltf.accessors[acc_idx];
+			auto const& view = gltf.bufferViews[acc.bufferView];
+			auto const& buf = gltf.buffers[view.buffer];
+
+			if (view.byteStride == 0)
+			{
+				std::memcpy(
+					&m_model.m_normals[offset],
+					buf.data.data() + view.byteOffset + acc.byteOffset,
+					acc.count * sizeof(XMFLOAT3));
+				continue;
+			}
+			for (size_t i = 0; i < acc.count; ++i)
+			{
+				std::memcpy(
+					&m_model.m_normals[offset + i],
+					buf.data.data() + view.byteOffset + acc.byteOffset + i * view.byteStride,
+					sizeof(XMFLOAT3));
+			}
+		}
+	}
+
+	void GLTFLoader::ProcessPrimitiveTexCoords()
+	{
+		std::vector<uint32_t> acc_cache(gltf.accessors.size(), -1);
+		size_t texcoord_count = 0;
+
+		for (size_t gltf_mesh_idx = 0; gltf_mesh_idx < gltf.meshes.size(); ++gltf_mesh_idx)
+		{
+			auto const& gltf_mesh = gltf.meshes[gltf_mesh_idx];
+			for (size_t gltf_prim_idx = 0; gltf_prim_idx < gltf_mesh.primitives.size(); ++gltf_prim_idx)
+			{
+				auto const& gltf_prim = gltf_mesh.primitives[gltf_prim_idx];
+				auto it = gltf_prim.attributes.find("TEXCOORD_0");
+				if (it == gltf_prim.attributes.end()) continue;
+
+				int acc_idx = it->second;
+				auto const& acc = gltf.accessors[acc_idx];
+				
+				const int submesh_idx = m_model.m_meshes[gltf_mesh_idx].m_submesh_offset + gltf_prim_idx;
+				auto& submesh = m_model.m_submeshes[submesh_idx];
+
+				if (acc_cache[acc_idx] == -1)
+				{
+					acc_cache[acc_idx] = u32(texcoord_count);
+					texcoord_count += acc.count;
+				}
+				submesh.m_uv0_offset = u32(acc_cache[acc_idx]);
+			}
+		}
+
+		m_model.m_uv0s.resize(texcoord_count);
+		for (size_t acc_idx = 0; acc_idx < gltf.accessors.size(); ++acc_idx)
+		{
+			const uint32_t offset = acc_cache[acc_idx];
+			if (offset == -1) continue;
+
+			auto const& acc = gltf.accessors[acc_idx];
+			auto const& view = gltf.bufferViews[acc.bufferView];
+			auto const& buf = gltf.buffers[view.buffer];
+
+			if (view.byteStride == 0)
+			{
+				std::memcpy(
+					&m_model.m_uv0s[offset],
+					buf.data.data() + view.byteOffset + acc.byteOffset,
+					acc.count * sizeof(XMFLOAT2));
+				continue;
+			}
+
+			for (size_t i = 0; i < acc.count; ++i)
+			{
+				std::memcpy(
+					&m_model.m_uv0s[offset + i],
+					buf.data.data() + view.byteOffset + acc.byteOffset + i * view.byteStride,
+					sizeof(XMFLOAT2));
+			}
+		}
+	}
+
+	void GLTFLoader::ProcessPrimitiveMaterials()
+	{
+		for (size_t gltf_mesh_idx = 0; gltf_mesh_idx < gltf.meshes.size(); ++gltf_mesh_idx)
+		{
+			auto const& gltf_mesh = gltf.meshes[gltf_mesh_idx];
+			for (size_t gltf_prim_idx = 0; gltf_prim_idx < gltf_mesh.primitives.size(); ++gltf_prim_idx)
+			{
+				auto const& gltf_prim = gltf_mesh.primitives[gltf_prim_idx];
+
+				const int submesh_idx = m_model.m_meshes[gltf_mesh_idx].m_submesh_offset + gltf_prim_idx;
+				auto& submesh = m_model.m_submeshes[submesh_idx];
+				submesh.m_material_idx = gltf_prim.material;
+			}
+		}
+	}
+
+	void GLTFLoader::ProcessTextures()
+	{
+		m_model.m_textures.reserve(gltf.images.size());
 		for (auto const& image : gltf.images)
 		{
-			StagingImage staging_image = {};
-
+			StagingTexture staging_texture = {};
 			if (image.bufferView != -1)
 			{
 				auto const& view = gltf.bufferViews[image.bufferView];
 				auto const& buf = gltf.buffers[view.buffer];
-				staging_image.src.assign(
-					reinterpret_cast<const char*>(buf.data.data() + view.byteOffset),
-					view.byteLength);
-
-				staging_image.is_embedded = true;
+				staging_texture.m_bytes.resize(view.byteLength);
+				std::memcpy(
+					staging_texture.m_bytes.data(),
+					buf.data.data() + view.byteOffset,
+					staging_texture.m_bytes.size());
 			}
 			else if (image.uri.rfind("data:", 0) == 0)
 			{
 				size_t comma_pos = image.uri.find(',');
-				staging_image.src = image.uri.substr(comma_pos + 1);
-				staging_image.is_embedded = true;
+				staging_texture.m_bytes.resize(image.uri.size() - comma_pos - 1);
+				std::memcpy(
+					staging_texture.m_bytes.data(),
+					image.uri.data() + comma_pos + 1,
+					staging_texture.m_bytes.size());
 			}
 			else
 			{
-				std::filesystem::path gltf_base_dir = std::filesystem::path(path).parent_path();
-				std::filesystem::path image_path = gltf_base_dir / image.uri;
-				staging_image.src = image_path.string();
+				std::filesystem::path gltf_base_dir = std::filesystem::path(gltf_path).parent_path();
+				std::filesystem::path texture_path = gltf_base_dir / image.uri;
+				staging_texture.m_path = texture_path.string();
 			}
-			ctx.staging_images.push_back(std::move(staging_image));
+			m_model.m_textures.push_back(std::move(staging_texture));
 		}
+	}
 
-		// Compute world matrices for all nodes in the scene.
-		ctx.world_matrices = ComputeWorldMatrices(gltf);
-
-
-		size_t primitive_count = 0;
-		std::vector<uint32_t> flatten_mesh_offsets;
-		flatten_mesh_offsets.reserve(gltf.meshes.size());
-
-		for (auto const& gltf_mesh : gltf.meshes)
+	void GLTFLoader::ProcessMaterials()
+	{
+		m_model.m_materials.reserve(gltf.materials.size());
+		for (auto const& gltf_mat : gltf.materials)
 		{
-			flatten_mesh_offsets.push_back(u32(primitive_count));
-			primitive_count += gltf_mesh.primitives.size();
-		}
-		ctx.model.meshes.reserve(primitive_count);
-		ctx.staging_buffer.reserve(64 * 1024);
+			StagingMaterial staging_mat = {};
+			staging_mat.m_emissive_factor = XMFLOAT3(
+				f32(gltf_mat.emissiveFactor[0]),
+				f32(gltf_mat.emissiveFactor[1]),
+				f32(gltf_mat.emissiveFactor[2]));
 
-		std::vector<int> acc_to_mesh_view(gltf.accessors.size(), -1);
-		std::vector<rr::ByteSpan> mesh_views;
-		mesh_views.reserve(gltf.accessors.size());
-
-		for (auto const& gltf_mesh : gltf.meshes)
-		{
-			for (auto const& primitive : gltf_mesh.primitives)
+			const int base_color_tex = gltf_mat.pbrMetallicRoughness.baseColorTexture.index;
+			if (base_color_tex != 0)
 			{
-				int acc_idxs[u32(Asset::Mesh::View::COUNT)];
-				std::fill_n(acc_idxs, _countof(acc_idxs), -1);
-				acc_idxs[u32(Asset::Mesh::View::POSITION)] = GetPrimitivePosition(primitive);
-				acc_idxs[u32(Asset::Mesh::View::NORMAL)] = GetPrimitiveNormal(primitive);
-				acc_idxs[u32(Asset::Mesh::View::UV)] = GetPrimitiveUV(primitive);
-				acc_idxs[u32(Asset::Mesh::View::INDEX)] = primitive.indices;
-
-
-				Asset::Mesh flatten_mesh = {};
-
-				if (primitive.indices != -1)
-				{
-					flatten_mesh.index_count = u32(gltf.accessors[primitive.indices].count);
-				}
-				if (const int pos_acc_idx = acc_idxs[u32(Asset::Mesh::View::POSITION)];
-					pos_acc_idx != -1)
-				{
-					flatten_mesh.vertex_count = u32(gltf.accessors[pos_acc_idx].count);
-				}
-
-				for (int slot = 0; slot < _countof(acc_idxs); ++slot)
-				{
-					const int acc_idx = acc_idxs[slot];
-					if (acc_idx == -1) continue;
-
-					if (const int byte_span_idx = acc_to_mesh_view[acc_idx];
-						byte_span_idx != -1)
-					{
-						flatten_mesh.views[slot] = mesh_views[byte_span_idx];
-						continue;
-					}
-
-
-					auto const& acc = gltf.accessors[acc_idx];
-					auto const& view = gltf.bufferViews[acc.bufferView];
-					auto const& buf = gltf.buffers[view.buffer];
-					uint8_t const* base = buf.data.data() + view.byteOffset + acc.byteOffset;
-
-					const int elem_size = GetElementSize(acc);
-					const size_t stride = view.byteStride ? view.byteStride : elem_size;
-
-					rr::ByteSpan mesh_view = {};
-					mesh_view.offset = u32(ctx.staging_buffer.size());
-					mesh_view.length = u32(acc.count * elem_size);
-					mesh_view.stride = u32(stride);
-					
-					acc_to_mesh_view[acc_idx] = i32(mesh_views.size());
-					mesh_views.push_back(mesh_view);
-
-					for (int i = 0; i < acc.count; ++i)
-					{
-						uint8_t const* elem_data = base + i * stride;
-						ctx.staging_buffer.insert(ctx.staging_buffer.end(), elem_data, elem_data + elem_size);
-					}
-
-					ctx.staging_buffer.resize(rr::AlignUp<4>(ctx.staging_buffer.size()));
-				}
-
-				ctx.model.meshes.push_back(flatten_mesh);
+				staging_mat.m_base_color_texture_idx = gltf.textures[base_color_tex].source;
 			}
-		}
 
-		// Populate material metadata.
-		for (auto& gltf_mesh : gltf.meshes)
-		{
-			for (auto& primitive : gltf_mesh.primitives)
+			staging_mat.m_metallic_factor = f32(gltf_mat.pbrMetallicRoughness.metallicFactor);
+			staging_mat.m_roughness_factor = f32(gltf_mat.pbrMetallicRoughness.roughnessFactor);
+			const int metallic_roughness_tex = gltf_mat.pbrMetallicRoughness.metallicRoughnessTexture.index;
+			if (metallic_roughness_tex != 0)
 			{
-				Asset::Material material = {};
-				if (primitive.material != -1)
-				{
-					auto& mat = gltf.materials[primitive.material];
-					if (auto it = mat.values.find("baseColorTexture"); it != mat.values.end())
-					{
-						material.base_color_texture_idx = it->second.TextureIndex();
-					}
-					if (auto it = mat.values.find("metallicFactor"); it != mat.values.end())
-					{
-						material.metallic_factor = f32(it->second.Factor());
-						material.has_metallic_factor = true;
-					}
-					if (auto it = mat.values.find("roughnessFactor"); it != mat.values.end())
-					{
-						material.roughness_factor = f32(it->second.Factor());
-						material.has_roughness_factor = true;
-					}
-				}
-				ctx.model.materials.push_back(material);
+				staging_mat.m_metallic_roughness_texture_idx = gltf.textures[metallic_roughness_tex].source;
 			}
-		}
 
-		for (int node_idx = 0; node_idx < gltf.nodes.size(); ++node_idx)
+			const int occlusion_tex = gltf_mat.occlusionTexture.index;
+			if (occlusion_tex != 0)
+			{
+				staging_mat.m_occlusion_texture_idx = gltf.textures[occlusion_tex].source;
+			}
+
+			const int normal_tex = gltf_mat.normalTexture.index;
+			if (normal_tex != 0)
+			{
+				staging_mat.m_normal_texture_idx = gltf.textures[normal_tex].source;
+			}
+
+			m_model.m_materials.push_back(std::move(staging_mat));
+		}
+	}
+
+	void GLTFLoader::ProcessMeshNodes()
+	{
+		for (uint16_t node_idx = 0; node_idx < gltf.nodes.size(); ++node_idx)
 		{
 			auto const& node = gltf.nodes[node_idx];
 			if (node.mesh < 0) continue;
 
-			for (int mesh_idx = flatten_mesh_offsets[node.mesh];
-				mesh_idx < gltf.meshes[node.mesh].primitives.size(); ++mesh_idx)
-			{
-				Asset::MeshNode mesh_node = {};
-				mesh_node.mesh_idx = node.mesh;
-				mesh_node.node_idx = node_idx;
-				ctx.model.mesh_nodes.push_back(mesh_node);
-			}
-		}
+			MeshInstance instance = {
+				.m_node_idx = node_idx,
+				.m_mesh_idx = u16(node.mesh)
+			};
 
-		return ctx;
+			m_model.m_instances.push_back(instance);
+		}
 	}
 
+	void GLTFLoader::ProcessNodeTransforms()
+	{
+		m_model.m_transforms = ComputeWorldTransforms(gltf);
+	}
+	void GLTFLoader::ConvertRhToLhPositions()
+	{
+		for (auto& pos : m_model.m_positions)
+		{
+			pos.z = -pos.z;
+		}
+	}
+	void GLTFLoader::ConvertRhToLhNormals()
+	{
+		for (auto& normal : m_model.m_normals)
+		{
+			normal.z = -normal.z;
+		}
+	}
+	void GLTFLoader::ConvertRhToLhTransforms()
+	{
+		// S = diag(1, 1, -1, 1)
+		// S * M * S
+		for (auto& transform : m_model.m_transforms)
+		{
+			transform._13 = -transform._13;
+			transform._23 = -transform._23;
+			transform._43 = -transform._43;
+
+			transform._31 = -transform._31;
+			transform._32 = -transform._32;
+			transform._34 = -transform._34;
+		}
+	}
+
+	void GLTFLoader::ConvertRhToLhIndices()
+	{
+		for (size_t i = 0; i < m_model.m_indices_u32.size(); i += 3)
+		{
+			std::swap(m_model.m_indices_u32[i + 1], m_model.m_indices_u32[i + 2]);
+		}
+
+		for (size_t i = 0; i < m_model.m_indices_u16.size(); i += 3)
+		{
+			std::swap(m_model.m_indices_u16[i + 1], m_model.m_indices_u16[i + 2]);
+		}
+	}
 }
+
+namespace rr
+{
+	StagingModel ModelLoader::LoadFromGLTF(std::string_view path)
+	{
+		GLTFLoader loader;
+		loader.Parse(path);
+		loader.ProcessPrimitiveIndices();
+		loader.ProcessPrimitivePositions();
+		loader.ProcessPrimitiveNormals();
+		loader.ProcessPrimitiveTexCoords();
+		loader.ProcessPrimitiveMaterials();
+		loader.ProcessTextures();
+		loader.ProcessMeshNodes();
+		loader.ProcessNodeTransforms();
+		loader.ConvertRhToLhPositions();
+		loader.ConvertRhToLhNormals();
+		loader.ConvertRhToLhTransforms();
+		loader.ConvertRhToLhIndices();
+
+		return loader.m_model;
+	}
+}
+

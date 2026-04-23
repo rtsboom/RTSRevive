@@ -16,11 +16,11 @@ namespace rr
 	//	ModelLoader::Context ctx = ModelLoader::LoadFromGLTF(path, m_image_path_cache);
 
 	//	// Matrix Z Flip
-	//	for (size_t i = 0; i < ctx.world_matrices.size(); ++i)
+	//	for (size_t i = 0; i < ctx.node_world_transforms.size(); ++i)
 	//	{
-	//		XMMATRIX m = XMLoadFloat4x4(&ctx.world_matrices[i]);
+	//		XMMATRIX m = XMLoadFloat4x4(&ctx.node_world_transforms[i]);
 	//		m *= XMMatrixScaling(1.f, 1.f, -1.f);
-	//		XMStoreFloat4x4(&ctx.world_matrices[i], m);
+	//		XMStoreFloat4x4(&ctx.node_world_transforms[i], m);
 	//	}
 
 	//	constexpr Asset::Geometry::BufferSlot slotsNeedZFlip[] =

@@ -144,6 +144,7 @@
     <ClInclude Include="GLTFLoader.h" />
     <ClInclude Include="ImagePathCache.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="StagingModel.h" />
     <ClInclude Include="TexturePool.h" />
   </ItemGroup>
   <ItemGroup>

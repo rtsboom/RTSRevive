@@ -13,36 +13,45 @@ namespace rr
 		uint32_t stride;
 	};
 
-	namespace Asset
+	enum class VertexAttribute // Can be extended with more attributes as needed.
 	{
-		struct Mesh
-		{
-			enum class View { POSITION, NORMAL, UV, INDEX, COUNT };
+		POSITION,
+		NORMAL,
+		UV,
+		COUNT
+	};
 
-			rr::ByteSpan views[u64(View::COUNT)];
-			int          material_idx;
-			uint32_t     vertex_count;
-			uint32_t     index_count;
-		};
+	struct MeshAsset
+	{
+		ByteSpan views[u64(VertexAttribute::COUNT)];
+		int      position;
+		int      normal;
+		int      uv0;
+		int      indices;
+		int      material;
+		uint32_t vertex_count;
+		uint32_t index_count;
+	};
 
-		struct Material
-		{
-			int   base_color_texture_idx;
-			float metallic_factor;
-			float roughness_factor;
-			bool  has_metallic_factor;
-			bool  has_roughness_factor;
-		};
+	struct MaterialAsset
+	{
+		int   base_color_texture_idx;
+		float metallic_factor;
+		float roughness_factor;
+		bool  has_metallic_factor;
+		bool  has_roughness_factor;
+	};
 
-		struct MeshNode { uint16_t mesh_idx, node_idx; };
+	struct MeshNode { uint16_t mesh_idx, node_idx; };
 
-		struct Model
-		{
-			std::vector<rr::Asset::Material> materials;
-			std::vector<rr::Asset::Mesh>     meshes;
+	struct ModelAsset
+	{
+		std::vector<ByteSpan>      buffer_views;
+		std::vector<MaterialAsset> materials;
+		std::vector<MeshAsset>     meshes;
 
-			std::vector<DirectX::XMFLOAT4X4> world_matrices; // flatten node hierarchy
-			std::vector<MeshNode>            mesh_nodes;
-		};
-	}
+		std::vector<DirectX::XMFLOAT4X4> node_world_transforms; // flatten node hierarchy
+		std::vector<MeshNode>            mesh_nodes;
+	};
+
 }

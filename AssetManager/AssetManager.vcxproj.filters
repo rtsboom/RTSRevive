@@ -10,6 +10,7 @@
     <ClInclude Include="ImagePathCache.h" />
     <ClInclude Include="TexturePool.h" />
     <ClInclude Include="AssetUtils.h" />
+    <ClInclude Include="StagingModel.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AssetManager.cpp" />
