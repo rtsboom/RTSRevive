@@ -1,5 +1,5 @@
 #include "EnginePch.h"
-#include "GraphicsDevice.h"
+#include "GpuDevice.h"
 
 namespace rr
 {
@@ -15,7 +15,7 @@ namespace rr
 		return adapter;
 	}
 
-	GraphicsDevice::GraphicsDevice(HWND hwnd)
+	GpuDevice::GpuDevice(HWND hwnd)
 		: m_hwnd(hwnd)
 	{
 		// [DEBUG] Enable debug interface
@@ -103,13 +103,13 @@ namespace rr
 		m_rtv_increment_size = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
 
-	void GraphicsDevice::Present()
+	void GpuDevice::Present()
 	{
 		const UINT flags = (m_tearing_support) ? DXGI_PRESENT_ALLOW_TEARING : 0;
 		m_swapchain->Present(0, flags);
 	}
 
-	void GraphicsDevice::Flush()
+	void GpuDevice::Flush()
 	{
 		const uint64_t fence_value = ++m_fence_value;
 		THROW_IF_FAILED(m_cmd_queue->Signal(m_fence.Get(), fence_value));
@@ -119,7 +119,7 @@ namespace rr
 			::WaitForSingleObject(m_fence_event.Get(), INFINITE);
 		}
 	}
-	void GraphicsDevice::Resize(uint32_t, uint32_t)
+	void GpuDevice::Resize(uint32_t, uint32_t)
 	{
 		Flush();
 		for (auto& back_buffer : m_rtv_resources)
@@ -135,7 +135,7 @@ namespace rr
 		
 		CreateRenderTargets();
 	}
-	void GraphicsDevice::CreateRenderTargets()
+	void GpuDevice::CreateRenderTargets()
 	{
 		CD3DX12_CPU_DESCRIPTOR_HANDLE handle(m_rtv_heap->GetCPUDescriptorHandleForHeapStart());
 		for (int i = 0; i < kBackBufferCount; ++i)

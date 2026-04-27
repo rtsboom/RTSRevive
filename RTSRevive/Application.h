@@ -1,6 +1,5 @@
 #pragma once
-#include <wrl/client.h>
-#include <Engine/GraphicsDevice.h>
+#include <Engine/GpuDevice.h>
 
 #include <Windows.h>
 #include <cstdint>
@@ -19,7 +18,7 @@ namespace rr
 		uint32_t m_window_width;
 		uint32_t m_window_height;
 
-		GraphicsDevice m_gfx_core;
+		GpuDevice m_gfx_core;
 	};
 
 }

@@ -5,19 +5,19 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EnginePch.cpp" />
-    <ClCompile Include="GraphicsDevice.cpp">
-      <Filter>Gfx</Filter>
+    <ClCompile Include="GpuDevice.cpp">
+      <Filter>Gpu</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EnginePch.h" />
     <ClInclude Include="SimpleEvent.h" />
-    <ClInclude Include="GraphicsDevice.h">
-      <Filter>Gfx</Filter>
+    <ClInclude Include="GpuDevice.h">
+      <Filter>Gpu</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="Gfx">
+    <Filter Include="Gpu">
       <UniqueIdentifier>{bf1c35ec-30bd-40ba-8d57-606f65a877a0}</UniqueIdentifier>
     </Filter>
   </ItemGroup>

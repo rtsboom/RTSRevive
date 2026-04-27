@@ -7,13 +7,15 @@
     <ClInclude Include="AssetManager.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="GLTFLoader.h" />
-    <ClInclude Include="TexturePool.h" />
     <ClInclude Include="StagingModel.h" />
+    <ClInclude Include="AssetPool.h" />
+    <ClInclude Include="AssetHandle.h" />
+    <ClInclude Include="Texture.h" />
+    <ClInclude Include="Model.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AssetManager.cpp" />
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="GLTFLoader.cpp" />
-    <ClCompile Include="TexturePool.cpp" />
   </ItemGroup>
 </Project>

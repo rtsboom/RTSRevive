@@ -8,7 +8,7 @@ namespace rr
 		, m_window_width(window_width)
 		, m_window_height(window_height)
 	{
-		m_gfx_core = GraphicsDevice(m_hwnd);
+		m_gfx_core = GpuDevice(m_hwnd);
 
 	}
 	void Application::OnWindowResize(uint32_t width, uint32_t height)

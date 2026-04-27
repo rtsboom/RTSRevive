@@ -1,13 +1,24 @@
 #pragma once
+#include "AssetHandle.h"
+#include "AssetPool.h"
+#include "Model.h"
+#include "Texture.h"
+
 #include <cstdint>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 namespace rr
 {
-	using ModelHandle = uint32_t;   
-	using MeshHandle = uint32_t;    
-	using MaterialHandle = uint32_t;
+	class IGpuRegistry
+	{
+
+	};
+
+	class IGpuUploader
+	{
+
+	};
 
 
 	using AssetPathCache = std::unordered_map<std::string, uint32_t>;
@@ -27,11 +38,21 @@ namespace rr
 	public:
 		ModelHandle LoadModel(std::string_view path);
 
-	private:
-		AssetPathCache m_path_cache;
+		void RemoveModel(ModelHandle handle) { m_model_pool.Remove(handle); }
+		void RemoveTexture(TextureHandle handle) { m_texture_pool.Remove(handle); }
+		
+		Model& GetModel(ModelHandle handle) { return m_model_pool.Get(handle); }
+		Model const& GetModel(ModelHandle handle) const { return m_model_pool.Get(handle); }
 
-		uint32_t m_model_count = 0;
-		uint32_t m_image_count = 0;
+		Texture& GetTexture(TextureHandle handle) { return m_texture_pool.Get(handle); }
+		Texture const& GetTexture(TextureHandle handle) const { return m_texture_pool.Get(handle); }
+
+	private:
+		AssetPool<Model, ModelHandle> m_model_pool;
+		AssetPool<Texture, TextureHandle> m_texture_pool;
+
+		IGpuRegistry* m_gpu_registry;
+		IGpuUploader* m_gpu_uploader;
 	};
 }
 

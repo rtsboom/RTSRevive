@@ -8,20 +8,20 @@ namespace rr
 {
 	using Microsoft::WRL::ComPtr;
 
-	class GraphicsDevice
+	class GpuDevice
 	{
 	public:
 		static constexpr unsigned int kBackBufferCount = 2;
 	public:
-		GraphicsDevice() = default;
-		~GraphicsDevice() noexcept = default;
-		GraphicsDevice(GraphicsDevice&&) noexcept = default;
-		GraphicsDevice& operator=(GraphicsDevice&&) noexcept = default;
+		GpuDevice() = default;
+		~GpuDevice() noexcept = default;
+		GpuDevice(GpuDevice&&) noexcept = default;
+		GpuDevice& operator=(GpuDevice&&) noexcept = default;
 		//Non copyable
-		GraphicsDevice(GraphicsDevice const&) = delete;
-		GraphicsDevice& operator=(GraphicsDevice const&) = delete;
+		GpuDevice(GpuDevice const&) = delete;
+		GpuDevice& operator=(GpuDevice const&) = delete;
 
-		GraphicsDevice(HWND hwnd);
+		GpuDevice(HWND hwnd);
 	public:
 		ID3D12Device5* GetDevice() const noexcept { return m_device.Get(); }
 		ID3D12CommandQueue* GetCommandQueue() const noexcept { return m_cmd_queue.Get(); }
