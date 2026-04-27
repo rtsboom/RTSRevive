@@ -39,13 +39,13 @@ namespace rr
 
 	struct StagingMaterial
 	{
-		DirectX::XMFLOAT3 m_emissive_factor = { 0, 0, 0 };
-		DirectX::XMFLOAT4 m_base_color_factor = { 1, 1, 1, 1 };
-		int      m_base_color_texture_idx = -1;
+		DirectX::XMFLOAT3 m_emissive_factor = { 0.0f, 0.0f, 0.0f };
+		int               m_base_color_texture_idx = -1;
+		DirectX::XMFLOAT4 m_base_color_factor = { 1.0f, 1.0f, 1.0f, 1.0f };
 
+		int      m_metallic_roughness_texture_idx = -1;
 		float    m_metallic_factor = 0.0f;
 		float    m_roughness_factor = 0.5f;
-		int      m_metallic_roughness_texture_idx = -1;
 
 		int      m_normal_texture_idx = -1;
 		int      m_occlusion_texture_idx = -1;
@@ -55,16 +55,16 @@ namespace rr
 	{
 		std::vector<StagingMesh>     m_meshes;
 		std::vector<StagingSubMesh>  m_submeshes;
-		std::vector<MeshInstance>    m_instances;
-		std::vector<StagingTexture>  m_textures;
 		std::vector<StagingMaterial> m_materials;
-		
+		std::vector<MeshInstance>    m_instances;
+
 		std::vector<DirectX::XMFLOAT3> m_positions;
 		std::vector<DirectX::XMFLOAT3> m_normals;
 		std::vector<DirectX::XMFLOAT2> m_uv0s;
 		std::vector<uint32_t> m_indices_u32;
 		std::vector<uint16_t> m_indices_u16;
 
+		std::vector<StagingTexture>  m_textures;
 		std::vector<DirectX::XMFLOAT4X4> m_transforms;
 	};
 }

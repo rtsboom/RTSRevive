@@ -7,9 +7,7 @@
     <ClInclude Include="AssetManager.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="GLTFLoader.h" />
-    <ClInclude Include="ImagePathCache.h" />
     <ClInclude Include="TexturePool.h" />
-    <ClInclude Include="AssetUtils.h" />
     <ClInclude Include="StagingModel.h" />
   </ItemGroup>
   <ItemGroup>
