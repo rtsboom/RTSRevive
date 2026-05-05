@@ -2,6 +2,7 @@
 #include "AssetManager.h"
 #include "StagingModel.h"
 #include "GLTFLoader.h"
+#include "Model.h"
 namespace rr
 {
 	ModelHandle AssetManager::LoadModel(std::string_view path)
@@ -13,5 +14,11 @@ namespace rr
 		}
 
 		return ModelHandle();
+	}
+	Model AssetManager::CreateModel(std::string_view path)
+	{
+		Model model = {};
+
+		return model;
 	}
 }

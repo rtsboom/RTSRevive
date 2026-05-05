@@ -1,6 +1,5 @@
 #pragma once
-#include "AssetHandle.h"
-#include "AssetPool.h"
+
 #include "Model.h"
 #include "Texture.h"
 
@@ -10,18 +9,29 @@
 #include <unordered_map>
 namespace rr
 {
-	class IGpuRegistry
+	struct IGpuRegistry
 	{
-
 	};
 
-	class IGpuUploader
+	struct IGpuUploader
 	{
-
 	};
 
 
 	using AssetPathCache = std::unordered_map<std::string, uint32_t>;
+
+	struct AssetLevelMark
+	{
+		uint16_t m_model_count;
+		uint16_t m_material_count;
+		uint16_t m_texture_count;
+		uint16_t m_primitive_count;
+
+		uint16_t m_position_count;
+		uint16_t m_skinning_count;
+		uint32_t m_vertex_byte_offset;
+		uint32_t m_index_byte_offset;
+	};
 
 	class AssetManager
 	{
@@ -36,20 +46,15 @@ namespace rr
 		AssetManager& operator=(AssetManager const&) = delete;
 
 	public:
-		ModelHandle LoadModel(std::string_view path);
+		uint32_t LoadModel(std::string_view path);
+		Model CreateModel(std::string_view path);
 
-		void RemoveModel(ModelHandle handle) { m_model_pool.Remove(handle); }
-		void RemoveTexture(TextureHandle handle) { m_texture_pool.Remove(handle); }
-		
-		Model& GetModel(ModelHandle handle) { return m_model_pool.Get(handle); }
-		Model const& GetModel(ModelHandle handle) const { return m_model_pool.Get(handle); }
 
-		Texture& GetTexture(TextureHandle handle) { return m_texture_pool.Get(handle); }
-		Texture const& GetTexture(TextureHandle handle) const { return m_texture_pool.Get(handle); }
 
 	private:
-		AssetPool<Model, ModelHandle> m_model_pool;
-		AssetPool<Texture, TextureHandle> m_texture_pool;
+		std::vector<Texture> m_textures;
+		std::vector<Model>   m_models;
+		std::vector<Primitive> m_primitives;
 
 		IGpuRegistry* m_gpu_registry;
 		IGpuUploader* m_gpu_uploader;

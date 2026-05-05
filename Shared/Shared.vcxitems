@@ -17,5 +17,6 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)CastUtils.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)MathUtils.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)RR_Framework.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)ShaderShared.h" />
   </ItemGroup>
 </Project>

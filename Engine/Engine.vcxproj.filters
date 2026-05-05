@@ -6,18 +6,28 @@
   <ItemGroup>
     <ClCompile Include="EnginePch.cpp" />
     <ClCompile Include="GpuDevice.cpp">
-      <Filter>Gpu</Filter>
+      <Filter>GPU</Filter>
     </ClCompile>
+    <ClCompile Include="GPURegistry.cpp">
+      <Filter>GPU</Filter>
+    </ClCompile>
+    <ClCompile Include="GPUBuffer.cpp" />
+    <ClCompile Include="GPUBumpHeap.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EnginePch.h" />
     <ClInclude Include="SimpleEvent.h" />
     <ClInclude Include="GpuDevice.h">
-      <Filter>Gpu</Filter>
+      <Filter>GPU</Filter>
     </ClInclude>
+    <ClInclude Include="GPURegistry.h">
+      <Filter>GPU</Filter>
+    </ClInclude>
+    <ClInclude Include="GPUBuffer.h" />
+    <ClInclude Include="GPUBumpHeap.h" />
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="Gpu">
+    <Filter Include="GPU">
       <UniqueIdentifier>{bf1c35ec-30bd-40ba-8d57-606f65a877a0}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
