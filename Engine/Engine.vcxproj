@@ -143,6 +143,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="GPUBuffer.cpp" />
+    <ClCompile Include="GPUBumpBuffer.cpp" />
     <ClCompile Include="GPUBumpHeap.cpp" />
     <ClCompile Include="GpuDevice.cpp" />
     <ClCompile Include="GPURegistry.cpp" />
@@ -150,6 +151,7 @@
   <ItemGroup>
     <ClInclude Include="EnginePch.h" />
     <ClInclude Include="GPUBuffer.h" />
+    <ClInclude Include="GPUBumpBuffer.h" />
     <ClInclude Include="GPUBumpHeap.h" />
     <ClInclude Include="GpuDevice.h" />
     <ClInclude Include="GPURegistry.h" />

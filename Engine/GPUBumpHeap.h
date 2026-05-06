@@ -14,13 +14,16 @@ namespace rr
 		GPUBumpHeap& operator=(GPUBumpHeap&&) = default;
 		GPUBumpHeap(GPUBumpHeap const&) = delete;
 		GPUBumpHeap& operator=(GPUBumpHeap const&) = delete;
+		
 		GPUBumpHeap(ID3D12Device* device, D3D12_HEAP_DESC const& desc);
 		ComPtr<ID3D12Resource> CreatePlacedResource(D3D12_RESOURCE_DESC desc);
+
+		ID3D12Heap* GetHeap() const noexcept { return heap_.Get(); }
 	private:
 		ID3D12Device* device_{};
 		ComPtr<ID3D12Heap> heap_{};
-		uint64_t heap_size_{};
-		uint64_t heap_offset_{};
+		uint64_t byte_capacity_{};
+		uint64_t byte_offset_{};
 	};
 
 }

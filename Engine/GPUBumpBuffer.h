@@ -1,0 +1,31 @@
+#pragma once
+#include "GPUBumpHeap.h"
+#include <d3d12.h>
+#include <wrl/client.h>
+namespace rr
+{
+
+	using Microsoft::WRL::ComPtr;
+
+	class GPUBumpBuffer
+	{ 
+	public:
+		// move only
+		GPUBumpBuffer() = default;
+		~GPUBumpBuffer() = default;
+		GPUBumpBuffer(GPUBumpBuffer&&) = default;
+		GPUBumpBuffer& operator=(GPUBumpBuffer&&) = default;
+
+		GPUBumpBuffer(GPUBumpHeap& gpu_heap, uint64_t byte_capacity);
+		uint64_t Alloc(uint64_t byte_size) noexcept;
+		uint64_t Snapshot() const noexcept;
+		void Restore(uint64_t snapshot) noexcept;
+
+		ID3D12Resource* Resource() const noexcept { return resource_.Get(); }
+	private:
+		ComPtr<ID3D12Resource> resource_{};
+		uint64_t byte_capacity_{};
+		uint64_t byte_offset_{};
+	};
+}
+

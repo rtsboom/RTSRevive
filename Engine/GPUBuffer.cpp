@@ -9,7 +9,7 @@ namespace rr
 	{
 		auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(byte_size);
-		THROW_IF_FAILED(device->CreateCommittedResource(
+		RR_D3D_CHECK(device->CreateCommittedResource(
 			&heapProps,
 			D3D12_HEAP_FLAG_NONE,
 			&bufferDesc,

@@ -41,15 +41,19 @@ namespace rr
 
 #include <stdexcept>
 
-inline void ThrowIfFailed(HRESULT hr, const char* msg = "")
-{
 
-	if (FAILED(hr))
-	{
-		char buffer[256];
-		sprintf_s(buffer, "HRESULT failed: %s (0x%08X)", msg, hr);
-		throw std::runtime_error(buffer);
-	}
-}
+#ifdef _DEBUG
+#define RR_D3D_CHECK(hr) \
+    do { if (FAILED(hr)) { __debugbreak(); } } while (false)
+#else
+#define RR_D3D_CHECK(hr) \
+    do { if (FAILED(hr)) { std::abort(); } } while (false)
+#endif
 
-#define THROW_IF_FAILED(x) ThrowIfFailed((x), #x)
+#ifdef _DEBUG
+#define  RR_CHECK(condition) \
+	do { if (!(condition)) { __debugbreak(); } } while (false)
+#else
+#define  RR_CHECK(condition) \
+	do { if (!(condition)) { std::abort(); } } while (false)
+#endif

@@ -15,13 +15,13 @@ namespace rr
 		{
 			D3D12_RESOURCE_DESC buffer_desc = CD3DX12_RESOURCE_DESC::Buffer(buffer_sizes_[i]);
 
-			THROW_IF_FAILED(
-				device->CreatePlacedResource(heap,
-					heap_offset,
-					&buffer_desc,
-					D3D12_RESOURCE_STATE_COMMON,
-					nullptr,
-					IID_PPV_ARGS(&buffers_[i])));
+			//THROW_IF_FAILED(
+			//	device->CreatePlacedResource(heap,
+			//		heap_offset,
+			//		&buffer_desc,
+			//		D3D12_RESOURCE_STATE_COMMON,
+			//		nullptr,
+			//		IID_PPV_ARGS(&buffers_[i])));
 		}
 
 

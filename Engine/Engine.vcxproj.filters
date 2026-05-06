@@ -12,7 +12,12 @@
       <Filter>GPU</Filter>
     </ClCompile>
     <ClCompile Include="GPUBuffer.cpp" />
-    <ClCompile Include="GPUBumpHeap.cpp" />
+    <ClCompile Include="GPUBumpHeap.cpp">
+      <Filter>GPU</Filter>
+    </ClCompile>
+    <ClCompile Include="GPUBumpBuffer.cpp">
+      <Filter>GPU</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EnginePch.h" />
@@ -24,7 +29,12 @@
       <Filter>GPU</Filter>
     </ClInclude>
     <ClInclude Include="GPUBuffer.h" />
-    <ClInclude Include="GPUBumpHeap.h" />
+    <ClInclude Include="GPUBumpHeap.h">
+      <Filter>GPU</Filter>
+    </ClInclude>
+    <ClInclude Include="GPUBumpBuffer.h">
+      <Filter>GPU</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="GPU">

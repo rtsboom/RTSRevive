@@ -8,34 +8,26 @@ namespace rr
 {
 	GPUBumpHeap::GPUBumpHeap(ID3D12Device* device, D3D12_HEAP_DESC const& desc)
 	{
-		THROW_IF_FAILED(device->CreateHeap(&desc, IID_PPV_ARGS(&heap_)));
+		RR_D3D_CHECK(device->CreateHeap(&desc, IID_PPV_ARGS(&heap_)));
 		device_ = device;
-		heap_size_ = desc.SizeInBytes;
-		heap_offset_ = 0;
+		byte_capacity_ = desc.SizeInBytes;
 	}
 
 	ComPtr<ID3D12Resource> GPUBumpHeap::CreatePlacedResource(D3D12_RESOURCE_DESC desc)
 	{
 		ComPtr<ID3D12Resource> resource;
 		D3D12_RESOURCE_ALLOCATION_INFO info = device_->GetResourceAllocationInfo(0, 1, &desc);
-		if (UINT64_MAX == info.SizeInBytes)
-		{
-			throw std::runtime_error("GPUBumpHeap: Failed to get resource allocation info.");
-		}
+		RR_CHECK(info.SizeInBytes != UINT64_MAX);
 
-		uint64_t heap_offset_aligned = AlignUp(heap_offset_, info.Alignment);
-		uint64_t heap_offset_next = heap_offset_aligned + info.SizeInBytes;
+		uint64_t byte_offset_aligned = AlignUp(byte_offset_, info.Alignment);
+		uint64_t byte_offset_next = byte_offset_aligned + info.SizeInBytes;
+		RR_CHECK(byte_offset_next <= byte_capacity_);
 
-		if (heap_size_ < heap_offset_next)
-		{
-			throw std::runtime_error("GPUBumpHeap: Not enough space in heap to create placed resource.");
-		}
-
-		THROW_IF_FAILED(device_->CreatePlacedResource(
-			heap_.Get(), heap_offset_aligned, &desc,
+		RR_D3D_CHECK(device_->CreatePlacedResource(
+			heap_.Get(), byte_offset_aligned, &desc,
 			D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&resource)));
 
-		heap_offset_ = heap_offset_next;
+		byte_offset_ = byte_offset_next;
 
 		return resource;
 	}
