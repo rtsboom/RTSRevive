@@ -1,5 +1,5 @@
 #include "EnginePch.h"
-#include "GpuDevice.h"
+#include "GPUDevice.h"
 
 namespace rr
 {
@@ -15,8 +15,8 @@ namespace rr
 		return adapter;
 	}
 
-	GpuDevice::GpuDevice(HWND hwnd)
-		: m_hwnd(hwnd)
+	GPUDevice::GPUDevice(HWND hwnd)
+		: hwnd_(hwnd)
 	{
 		// [DEBUG] Enable debug interface
 	#ifdef RR_D3D12_DEBUG
@@ -28,15 +28,15 @@ namespace rr
 	#endif
 
 		// Create the DXGI factory and the D3D12 device
-		::CreateDXGIFactory2(0, IID_PPV_ARGS(&m_factory));
-		auto adapter = GetHighPerformanceAdapter(m_factory.Get());
+		::CreateDXGIFactory2(0, IID_PPV_ARGS(&factory_));
+		auto adapter = GetHighPerformanceAdapter(factory_.Get());
 		D3D_FEATURE_LEVEL feature_level = D3D_FEATURE_LEVEL_11_0;
-		RR_D3D_CHECK(::D3D12CreateDevice(adapter.Get(), feature_level, IID_PPV_ARGS(&m_device)));
+		RR_D3D_CHECK(::D3D12CreateDevice(adapter.Get(), feature_level, IID_PPV_ARGS(&device_)));
 
 		// [DEBUG] Enable breaking on D3D12 errors and corruption
 	#ifdef RR_D3D12_DEBUG
 		ComPtr<ID3D12InfoQueue1> info_queue;
-		if (SUCCEEDED(m_device->QueryInterface(IID_PPV_ARGS(&info_queue))))
+		if (SUCCEEDED(device_->QueryInterface(IID_PPV_ARGS(&info_queue))))
 		{
 			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
 			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
@@ -49,16 +49,16 @@ namespace rr
 		cmd_queue_desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
 		cmd_queue_desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 		cmd_queue_desc.NodeMask = 0;
-		RR_D3D_CHECK(m_device->CreateCommandQueue(&cmd_queue_desc, IID_PPV_ARGS(&m_cmd_queue)));
+		RR_D3D_CHECK(device_->CreateCommandQueue(&cmd_queue_desc, IID_PPV_ARGS(&cmd_queue_)));
 
 		// Check for tearing support
 		BOOL allow_tearing = {};
-		m_factory->CheckFeatureSupport(
+		factory_->CheckFeatureSupport(
 			DXGI_FEATURE_PRESENT_ALLOW_TEARING,
 			&allow_tearing,
 			sizeof(allow_tearing));
 
-		m_tearing_support = (allow_tearing == TRUE);
+		tearing_support_ = (allow_tearing == TRUE);
 
 		// Create the swapchain
 		DXGI_SWAP_CHAIN_DESC1 swapchain_desc = {};
@@ -68,28 +68,28 @@ namespace rr
 		swapchain_desc.SampleDesc.Count = 1;
 		swapchain_desc.SampleDesc.Quality = 0;
 		swapchain_desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-		swapchain_desc.Flags = m_tearing_support ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+		swapchain_desc.Flags = tearing_support_ ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 
 		ComPtr<IDXGISwapChain1> swapchain1;
-		RR_D3D_CHECK(m_factory->CreateSwapChainForHwnd(
-			m_cmd_queue.Get(),
-			m_hwnd,
+		RR_D3D_CHECK(factory_->CreateSwapChainForHwnd(
+			cmd_queue_.Get(),
+			hwnd_,
 			&swapchain_desc,
 			nullptr,
 			nullptr,
 			&swapchain1
 		));
-		RR_D3D_CHECK(swapchain1.As(&m_swapchain));
+		RR_D3D_CHECK(swapchain1.As(&swapchain_));
 
 		// Disable the ALT+ENTER fullscreen toggle feature
-		RR_D3D_CHECK(m_factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER));
+		RR_D3D_CHECK(factory_->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER));
 
 		// Create the fence for flushing the command queue
-		m_fence_value = 0;
-		RR_D3D_CHECK(m_device->CreateFence(m_fence_value, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
+		fence_value_ = 0;
+		RR_D3D_CHECK(device_->CreateFence(fence_value_, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence_)));
 
 		// Create the event for waiting on the fence
-		m_fence_event = SimpleEvent(::CreateEventW(nullptr, FALSE, FALSE, nullptr));
+		fence_event_ = SimpleEvent(::CreateEventW(nullptr, FALSE, FALSE, nullptr));
 
 
 		// Create the RTV descriptor heap
@@ -98,52 +98,52 @@ namespace rr
 		heap_desc.NumDescriptors = kBackBufferCount;
 		heap_desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		heap_desc.NodeMask = 0;
-		RR_D3D_CHECK(m_device->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&m_rtv_heap)));
+		RR_D3D_CHECK(device_->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&rtv_heap_)));
 
-		m_rtv_increment_size = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		rtv_handle_size_ = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
 
-	void GpuDevice::Present()
+	void GPUDevice::Present()
 	{
-		const UINT flags = (m_tearing_support) ? DXGI_PRESENT_ALLOW_TEARING : 0;
-		m_swapchain->Present(0, flags);
+		const UINT flags = (tearing_support_) ? DXGI_PRESENT_ALLOW_TEARING : 0;
+		swapchain_->Present(0, flags);
 	}
 
-	void GpuDevice::Flush()
+	void GPUDevice::Flush()
 	{
-		const uint64_t fence_value = ++m_fence_value;
-		RR_D3D_CHECK(m_cmd_queue->Signal(m_fence.Get(), fence_value));
-		if (m_fence->GetCompletedValue() < fence_value)
+		const uint64_t fence_value = ++fence_value_;
+		RR_D3D_CHECK(cmd_queue_->Signal(fence_.Get(), fence_value));
+		if (fence_->GetCompletedValue() < fence_value)
 		{
-			RR_D3D_CHECK(m_fence->SetEventOnCompletion(fence_value, m_fence_event.Get()));
-			::WaitForSingleObject(m_fence_event.Get(), INFINITE);
+			RR_D3D_CHECK(fence_->SetEventOnCompletion(fence_value, fence_event_.Get()));
+			::WaitForSingleObject(fence_event_.Get(), INFINITE);
 		}
 	}
-	void GpuDevice::Resize(uint32_t, uint32_t)
+	void GPUDevice::Resize(uint32_t, uint32_t)
 	{
 		Flush();
-		for (auto& back_buffer : m_rtv_resources)
+		for (auto& back_buffer : rtv_resources_)
 		{
 			back_buffer.Reset();
 		}
 
 
-		RR_D3D_CHECK(m_swapchain->ResizeBuffers(
+		RR_D3D_CHECK(swapchain_->ResizeBuffers(
 			kBackBufferCount, 0, 0, 
 			DXGI_FORMAT_R8G8B8A8_UNORM, 
-			m_tearing_support ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0));
+			tearing_support_ ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0));
 		
 		CreateRenderTargets();
 	}
-	void GpuDevice::CreateRenderTargets()
+	void GPUDevice::CreateRenderTargets()
 	{
-		CD3DX12_CPU_DESCRIPTOR_HANDLE handle(m_rtv_heap->GetCPUDescriptorHandleForHeapStart());
+		CD3DX12_CPU_DESCRIPTOR_HANDLE handle(rtv_heap_->GetCPUDescriptorHandleForHeapStart());
 		for (int i = 0; i < kBackBufferCount; ++i)
 		{
-			RR_D3D_CHECK(m_swapchain->GetBuffer(i, IID_PPV_ARGS(&m_rtv_resources[i])));
-			m_device->CreateRenderTargetView(m_rtv_resources[i].Get(), nullptr, handle);
-			m_rtv_handles[i] = handle;
-			handle.Offset(1, m_rtv_increment_size);
+			RR_D3D_CHECK(swapchain_->GetBuffer(i, IID_PPV_ARGS(&rtv_resources_[i])));
+			device_->CreateRenderTargetView(rtv_resources_[i].Get(), nullptr, handle);
+			rtv_handles_[i] = handle;
+			handle.Offset(1, rtv_handle_size_);
 		}
 	}
 }

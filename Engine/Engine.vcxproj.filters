@@ -5,13 +5,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EnginePch.cpp" />
-    <ClCompile Include="GpuDevice.cpp">
+    <ClCompile Include="GPUDevice.cpp">
       <Filter>GPU</Filter>
     </ClCompile>
     <ClCompile Include="GPURegistry.cpp">
       <Filter>GPU</Filter>
     </ClCompile>
-    <ClCompile Include="GPUBuffer.cpp" />
     <ClCompile Include="GPUBumpHeap.cpp">
       <Filter>GPU</Filter>
     </ClCompile>
@@ -22,13 +21,12 @@
   <ItemGroup>
     <ClInclude Include="EnginePch.h" />
     <ClInclude Include="SimpleEvent.h" />
-    <ClInclude Include="GpuDevice.h">
+    <ClInclude Include="GPUDevice.h">
       <Filter>GPU</Filter>
     </ClInclude>
     <ClInclude Include="GPURegistry.h">
       <Filter>GPU</Filter>
     </ClInclude>
-    <ClInclude Include="GPUBuffer.h" />
     <ClInclude Include="GPUBumpHeap.h">
       <Filter>GPU</Filter>
     </ClInclude>

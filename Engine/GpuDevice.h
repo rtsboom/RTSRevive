@@ -8,24 +8,24 @@ namespace rr
 {
 	using Microsoft::WRL::ComPtr;
 
-	class GpuDevice
+	class GPUDevice
 	{
 	public:
 		static constexpr unsigned int kBackBufferCount = 2;
 	public:
-		GpuDevice() = default;
-		~GpuDevice() noexcept = default;
-		GpuDevice(GpuDevice&&) noexcept = default;
-		GpuDevice& operator=(GpuDevice&&) noexcept = default;
+		GPUDevice() = default;
+		~GPUDevice() noexcept = default;
+		GPUDevice(GPUDevice&&) noexcept = default;
+		GPUDevice& operator=(GPUDevice&&) noexcept = default;
 		//Non copyable
-		GpuDevice(GpuDevice const&) = delete;
-		GpuDevice& operator=(GpuDevice const&) = delete;
+		GPUDevice(GPUDevice const&) = delete;
+		GPUDevice& operator=(GPUDevice const&) = delete;
 
-		GpuDevice(HWND hwnd);
+		GPUDevice(HWND hwnd);
 	public:
-		ID3D12Device5* GetDevice() const noexcept { return m_device.Get(); }
-		ID3D12CommandQueue* GetCommandQueue() const noexcept { return m_cmd_queue.Get(); }
-		uint32_t GetBackBufferIndex() const { return m_swapchain->GetCurrentBackBufferIndex(); }
+		ID3D12Device5* GetDevice() const noexcept { return device_.Get(); }
+		ID3D12CommandQueue* GetCommandQueue() const noexcept { return cmd_queue_.Get(); }
+		uint32_t GetBackBufferIndex() const { return swapchain_->GetCurrentBackBufferIndex(); }
 
 		void Present();
 		void Flush();
@@ -35,22 +35,22 @@ namespace rr
 		void CreateRenderTargets();
 
 	private:
-		HWND m_hwnd = nullptr;
-		ComPtr<IDXGIFactory6> m_factory;
-		ComPtr<ID3D12Device5> m_device;
-		ComPtr<ID3D12CommandQueue> m_cmd_queue;
-		ComPtr<IDXGISwapChain3>    m_swapchain;
+		HWND hwnd_{};
+		ComPtr<IDXGIFactory6> factory_{};
+		ComPtr<ID3D12Device5> device_{};
+		ComPtr<ID3D12CommandQueue> cmd_queue_{};
+		ComPtr<IDXGISwapChain3>    swapchain_{};
 
-		uint64_t                   m_fence_value = 0;
-		ComPtr<ID3D12Fence>        m_fence;
-		SimpleEvent                m_fence_event;
+		uint64_t                   fence_value_{};
+		ComPtr<ID3D12Fence>        fence_{};
+		SimpleEvent                fence_event_{};
 
-		ComPtr<ID3D12DescriptorHeap> m_rtv_heap;
-		ComPtr<ID3D12Resource>       m_rtv_resources[kBackBufferCount];
-		D3D12_CPU_DESCRIPTOR_HANDLE  m_rtv_handles[kBackBufferCount] = {};
-		uint32_t                     m_rtv_increment_size = 0;
+		ComPtr<ID3D12DescriptorHeap> rtv_heap_{};
+		ComPtr<ID3D12Resource>       rtv_resources_[kBackBufferCount]{};
+		D3D12_CPU_DESCRIPTOR_HANDLE  rtv_handles_[kBackBufferCount]{};
+		uint32_t                     rtv_handle_size_{};
 
-		bool m_tearing_support = false;
+		bool tearing_support_ = false;
 	};
 
 }
