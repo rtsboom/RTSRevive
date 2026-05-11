@@ -1,7 +1,14 @@
 #pragma once
 #include "StagingModel.h"
+#include <string>
+#include <memory>
+#include "AssetBase.h"
 
-#include <string_view>
+
+namespace rr
+{
+	std::unique_ptr<AssetBase> ImportGLTF(std::string const& filename);
+}
 
 namespace rr::ModelLoader
 {

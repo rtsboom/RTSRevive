@@ -1,29 +1,54 @@
 #include "pch.h"
 #include "GeometryRegistry.h"
-#include <d3d12.h>
+#include <CastUtils.h>
+#include <utility>
 #include <cstdint>
-#include <cstring>
 
 
 namespace rr
 {
-	GeometryRegistry::GeometryRegistry(GPUBumpHeap& gpu_heap, uint32_t const* buffer_sizes)
+	GeometryRegistry::GeometryRegistry(GeometryBuffers& pack)
 	{
-		std::memcpy(buffer_sizes_, buffer_sizes, sizeof(buffer_sizes_));
-		// Create D3D12 Placed Buffers
-		for (size_t i{}; i < sz(GeometryBuffers::Count); ++i)
+		buffers_[sz(GeometrySlot::Index)] = std::move(pack.index_buffer);
+		buffers_[sz(GeometrySlot::Position)] = std::move(pack.position_buffer);
+		buffers_[sz(GeometrySlot::Surface)] = std::move(pack.surface_buffer);
+		buffers_[sz(GeometrySlot::Skin)] = std::move(pack.skin_buffer);
+	}
+	uint64_t GeometryRegistry::Alloc(GeometrySlot slot, uint32_t byte_size) noexcept
+	{
+		return buffers_[sz(slot)].Alloc(byte_size);
+	}
+	uint64_t GeometryRegistry::AllocIndexData(uint64_t byte_size) noexcept
+	{
+		return Alloc(GeometrySlot::Index, byte_size);
+	}
+	uint64_t GeometryRegistry::AllocPositionData(uint64_t byte_size) noexcept
+	{
+		return Alloc(GeometrySlot::Position, byte_size);
+	}
+	uint64_t GeometryRegistry::AllocSurfaceData(uint64_t byte_size) noexcept
+	{
+		return Alloc(GeometrySlot::Surface, byte_size);
+	}
+	uint64_t GeometryRegistry::AllocSkinData(uint64_t byte_size) noexcept
+	{
+		return Alloc(GeometrySlot::Skin, byte_size);
+	}
+	GeometrySnapshot GeometryRegistry::Snapshot() const noexcept
+	{
+		GeometrySnapshot snapshot = {};
+		for (size_t i{}; i < sz(GeometrySlot::Count); ++i)
 		{
-			D3D12_RESOURCE_DESC buffer_desc = CD3DX12_RESOURCE_DESC::Buffer(buffer_sizes_[i]);
-
-			//THROW_IF_FAILED(
-			//	device->CreatePlacedResource(heap,
-			//		heap_offset,
-			//		&buffer_desc,
-			//		D3D12_RESOURCE_STATE_COMMON,
-			//		nullptr,
-			//		IID_PPV_ARGS(&buffers_[i])));
+			snapshot.buffer_snapshots[i] = buffers_[i].Snapshot();
 		}
 
-
+		return snapshot;
+	}
+	void GeometryRegistry::Restore(GeometrySnapshot const& snapshot) noexcept
+	{
+		for (size_t i{}; i < sz(GeometrySlot::Count); ++i)
+		{
+			buffers_[i].Restore(snapshot.buffer_snapshots[i]);
+		}
 	}
 }

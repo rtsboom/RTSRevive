@@ -2,6 +2,8 @@
 #include "GPUBumpHeap.h"
 #include <d3d12.h>
 #include <wrl/client.h>
+#include <type_traits>
+#include <cstdint>
 namespace rr
 {
 
@@ -16,7 +18,7 @@ namespace rr
 		GPUBumpBuffer(GPUBumpBuffer&&) = default;
 		GPUBumpBuffer& operator=(GPUBumpBuffer&&) = default;
 
-		GPUBumpBuffer(GPUBumpHeap& gpu_heap, uint64_t byte_capacity);
+		GPUBumpBuffer(GPUBumpHeap& gpu_heap, uint64_t byte_capacity) noexcept;
 		uint64_t Alloc(uint64_t byte_size) noexcept;
 		uint64_t Snapshot() const noexcept;
 		void Restore(uint64_t snapshot) noexcept;
@@ -27,5 +29,8 @@ namespace rr
 		uint64_t byte_capacity_{};
 		uint64_t byte_offset_{};
 	};
+
+	static_assert(std::is_nothrow_move_constructible_v<GPUBumpBuffer>);
+	static_assert(std::is_nothrow_move_assignable_v<GPUBumpBuffer>);
 }
 

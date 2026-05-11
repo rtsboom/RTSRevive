@@ -24,7 +24,7 @@ namespace rr
 		GPUDevice(HWND hwnd);
 	public:
 		ID3D12Device5* GetDevice() const noexcept { return device_.Get(); }
-		ID3D12CommandQueue* GetCommandQueue() const noexcept { return cmd_queue_.Get(); }
+		ID3D12CommandQueue* GetCommandQueue() const noexcept { return queue_.Get(); }
 		uint32_t GetBackBufferIndex() const { return swapchain_->GetCurrentBackBufferIndex(); }
 
 		void Present();
@@ -38,7 +38,7 @@ namespace rr
 		HWND hwnd_{};
 		ComPtr<IDXGIFactory6> factory_{};
 		ComPtr<ID3D12Device5> device_{};
-		ComPtr<ID3D12CommandQueue> cmd_queue_{};
+		ComPtr<ID3D12CommandQueue> queue_{};
 		ComPtr<IDXGISwapChain3>    swapchain_{};
 
 		uint64_t                   fence_value_{};
@@ -50,7 +50,7 @@ namespace rr
 		D3D12_CPU_DESCRIPTOR_HANDLE  rtv_handles_[kBackBufferCount]{};
 		uint32_t                     rtv_handle_size_{};
 
-		bool tearing_support_ = false;
+		bool allow_tearing_ = false;
 	};
 
 }

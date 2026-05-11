@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "GLTFLoader.h"
 #include "StagingModel.h"
+#include "ModelAsset.h"
 #include <CastUtils.h>
 
 #pragma warning(push, 0)
@@ -8,6 +9,8 @@
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 #define TINYGLTF_IMPLEMENTATION
 #include <tinygltf/tiny_gltf.h>
+
+#include <TinyGLTFv3/tiny_gltf_v3.h>
 #pragma warning(pop)
 
 #include <DirectXMath.h>
@@ -18,11 +21,64 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <cstdint>
+#include <vector>
+#include <fstream>
 
 namespace
 {
 	using namespace DirectX;
 	using namespace rr;
+
+	class GltfImporter
+	{
+	public:
+		explicit GltfImporter(tg3_model const* model) : model_(model) {}
+		std::unique_ptr<AssetBase> Import()
+		{
+			ModelAsset out{};
+			ExtractMeshes(out);
+			ExtractMaterials(out);
+			ExtractAnimations(out);
+
+
+			return std::make_unique<ModelAsset>(std::move(out));
+		}
+	private:
+		void ExtractMeshes(ModelAsset& out);
+		void ExtractMaterials(ModelAsset& out);
+		void ExtractAnimations(ModelAsset& out);
+
+		tg3_model const* model_{};
+	};
+
+	void GltfImporter::ExtractMeshes(ModelAsset& out)
+	{
+		for (uint32_t mesh_idx{}; model_->meshes_count; ++mesh_idx)
+		{
+			tg3_mesh const& mesh = model_->meshes[mesh_idx];
+			for (uint32_t prim_idx{}; prim_idx < mesh.primitives_count; ++prim_idx)
+			{
+				tg3_primitive const& prim = mesh.primitives[prim_idx];
+
+				Geometry geo{};
+				geo.index_byte_offset = u32(out.indices.size());
+				geo.position_base_idx = u32(out.positions.size());
+				geo.surface_base_idx = u32(out.surfaces.size());
+				geo.skin_base_idx = u32(out.skins.size());
+
+				//TODO:
+				//ExtractIndices(...);
+				//ExtractPositions(...);
+				//ExtractSurfaces(...);
+				//ExtractSkins(...);
+
+				out.geometries.push_back(geo);
+			}
+		}
+
+	}
+
 
 	XMMATRIX GetLocalMatrix(tinygltf::Node const& node)
 	{
@@ -552,5 +608,20 @@ namespace rr
 
 		return m_model;
 	}
-}
+	std::unique_ptr<AssetBase> ImportGLTF(std::string const& filename)
+	{
+		tg3_parse_options opts;
+		tg3_parse_options_init(&opts);
+		opts.images_as_is = 1; // Don't decode images
+		opts.image = {};
+		tg3_error_stack errors;
+		tg3_model model;
+		tg3_error_code err = tg3_parse_file(&model, &errors, filename.data(), u32(filename.size()), &opts);
 
+		GltfImporter importer{ &model };
+
+		tg3_model_free(&model);
+		tg3_error_stack_free(&errors);
+		return std::unique_ptr<AssetBase>();
+	}
+}

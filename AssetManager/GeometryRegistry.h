@@ -1,7 +1,5 @@
 #pragma once
-#include <Engine/GPUBumpHeap.h>
-#include <d3d12.h>
-#include <wrl/client.h>
+#include <Engine/GPUBumpBuffer.h>
 #include <cstdint>
 #include <CastUtils.h>
 
@@ -10,13 +8,26 @@ namespace rr
 {
 	using Microsoft::WRL::ComPtr;
 
-	enum class GeometryBuffers
+	enum class GeometrySlot
 	{
 		Index,
 		Position,
 		Surface,
 		Skin,
 		Count
+	};
+
+	struct GeometryBuffers
+	{
+		GPUBumpBuffer index_buffer;
+		GPUBumpBuffer position_buffer;
+		GPUBumpBuffer surface_buffer;
+		GPUBumpBuffer skin_buffer;
+	};
+
+	struct GeometrySnapshot
+	{
+		uint64_t buffer_snapshots[sz(GeometrySlot::Count)];
 	};
 
 	// Global vertex and index streams 
@@ -30,36 +41,20 @@ namespace rr
 		GeometryRegistry(GeometryRegistry const&) = delete;
 		GeometryRegistry& operator=(GeometryRegistry const&) = delete;
 
-		GeometryRegistry(GPUBumpHeap& gpu_heap, uint32_t const* buffer_sizes);
+		GeometryRegistry(GeometryBuffers& pack);
 
 
-		uint32_t Alloc(GeometryBuffers attr, uint32_t buffer_size) noexcept
-		{
-			uint32_t const offset = buffer_offsets_[sz(attr)];
-			buffer_offsets_[sz(attr)] += buffer_size;
-			return offset;
-		}
+		uint64_t Alloc(GeometrySlot slot, uint32_t byte_size) noexcept;
+		uint64_t AllocIndexData(uint64_t byte_size) noexcept;
+		uint64_t AllocPositionData(uint64_t byte_size) noexcept;
+		uint64_t AllocSurfaceData(uint64_t byte_size) noexcept;
+		uint64_t AllocSkinData(uint64_t byte_size) noexcept;
 
-		void Tell(uint32_t* buffer_offsets) const noexcept 
-		{ 
-			for (size_t i = 0; i < sz(GeometryBuffers::Count); ++i)
-			{
-				buffer_offsets[i] = buffer_offsets_[i];
-			}
-		}
-
-		void Seek(uint32_t const* buffer_offsets) noexcept
-		{
-			for (size_t i = 0; i < sz(GeometryBuffers::Count); ++i)
-			{
-				buffer_offsets_[i] = buffer_offsets[i];
-			}
-		}
+		GeometrySnapshot Snapshot() const noexcept;
+		void Restore(GeometrySnapshot const& snapshot) noexcept;
 
 	private:
-		ComPtr<ID3D12Resource> buffers_[sz(GeometryBuffers::Count)];
-		uint32_t buffer_sizes_[sz(GeometryBuffers::Count)] = {};
-		uint32_t buffer_offsets_[sz(GeometryBuffers::Count)] = {};
+		GPUBumpBuffer buffers_[sz(GeometrySlot::Count)] = {};
 	};
 
 }

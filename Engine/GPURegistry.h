@@ -1,9 +1,9 @@
 #pragma once
-#include "GPUBumpHeap.h"
-#include <CastUtils.h>
+#include "GPUBumpBuffer.h"
 #include <d3d12.h>
 #include <wrl/client.h>
 #include <cstdint>
+#include <vector>
 
 namespace rr
 {
@@ -31,10 +31,12 @@ namespace rr
 		GPURegistry(GPURegistry const&) = delete;
 		GPURegistry& operator=(GPURegistry const&) = delete;
 
-
-
-
+		// Add gpu buffer; Return gpu buffer index;
+		uint64_t AddBuffer(GPUBumpBuffer&& gpu_buffer) noexcept;
+		GPUBumpBuffer& GetBuffer(uint64_t handle) noexcept;
 	private:
+		std::vector<GPUBumpBuffer> buffers_{};
 
+		ComPtr<ID3D12DescriptorHeap> descriptors_;
 	};
 }

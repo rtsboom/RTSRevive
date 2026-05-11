@@ -3,7 +3,7 @@
 
 namespace rr
 {
-	static ComPtr<IDXGIAdapter1> GetHighPerformanceAdapter(IDXGIFactory6* factory)
+	static ComPtr<IDXGIAdapter1> GetHighPerformanceAdapter(ComPtr<IDXGIFactory6>& factory)
 	{
 		ComPtr<IDXGIAdapter1> adapter;
 		RR_D3D_CHECK(factory->EnumAdapterByGpuPreference(
@@ -29,7 +29,7 @@ namespace rr
 
 		// Create the DXGI factory and the D3D12 device
 		::CreateDXGIFactory2(0, IID_PPV_ARGS(&factory_));
-		auto adapter = GetHighPerformanceAdapter(factory_.Get());
+		auto adapter = GetHighPerformanceAdapter(factory_);
 		D3D_FEATURE_LEVEL feature_level = D3D_FEATURE_LEVEL_11_0;
 		RR_D3D_CHECK(::D3D12CreateDevice(adapter.Get(), feature_level, IID_PPV_ARGS(&device_)));
 
@@ -49,16 +49,16 @@ namespace rr
 		cmd_queue_desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
 		cmd_queue_desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 		cmd_queue_desc.NodeMask = 0;
-		RR_D3D_CHECK(device_->CreateCommandQueue(&cmd_queue_desc, IID_PPV_ARGS(&cmd_queue_)));
+		RR_D3D_CHECK(device_->CreateCommandQueue(&cmd_queue_desc, IID_PPV_ARGS(&queue_)));
 
 		// Check for tearing support
-		BOOL allow_tearing = {};
+		BOOL allow_tearing = FALSE;
 		factory_->CheckFeatureSupport(
 			DXGI_FEATURE_PRESENT_ALLOW_TEARING,
 			&allow_tearing,
 			sizeof(allow_tearing));
 
-		tearing_support_ = (allow_tearing == TRUE);
+		allow_tearing_ = (allow_tearing == TRUE);
 
 		// Create the swapchain
 		DXGI_SWAP_CHAIN_DESC1 swapchain_desc = {};
@@ -68,11 +68,11 @@ namespace rr
 		swapchain_desc.SampleDesc.Count = 1;
 		swapchain_desc.SampleDesc.Quality = 0;
 		swapchain_desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-		swapchain_desc.Flags = tearing_support_ ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+		swapchain_desc.Flags = allow_tearing_ ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 
 		ComPtr<IDXGISwapChain1> swapchain1;
 		RR_D3D_CHECK(factory_->CreateSwapChainForHwnd(
-			cmd_queue_.Get(),
+			queue_.Get(),
 			hwnd_,
 			&swapchain_desc,
 			nullptr,
@@ -105,14 +105,14 @@ namespace rr
 
 	void GPUDevice::Present()
 	{
-		const UINT flags = (tearing_support_) ? DXGI_PRESENT_ALLOW_TEARING : 0;
+		const UINT flags = (allow_tearing_) ? DXGI_PRESENT_ALLOW_TEARING : 0;
 		swapchain_->Present(0, flags);
 	}
 
 	void GPUDevice::Flush()
 	{
 		const uint64_t fence_value = ++fence_value_;
-		RR_D3D_CHECK(cmd_queue_->Signal(fence_.Get(), fence_value));
+		RR_D3D_CHECK(queue_->Signal(fence_.Get(), fence_value));
 		if (fence_->GetCompletedValue() < fence_value)
 		{
 			RR_D3D_CHECK(fence_->SetEventOnCompletion(fence_value, fence_event_.Get()));
@@ -131,7 +131,7 @@ namespace rr
 		RR_D3D_CHECK(swapchain_->ResizeBuffers(
 			kBackBufferCount, 0, 0, 
 			DXGI_FORMAT_R8G8B8A8_UNORM, 
-			tearing_support_ ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0));
+			allow_tearing_ ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0));
 		
 		CreateRenderTargets();
 	}

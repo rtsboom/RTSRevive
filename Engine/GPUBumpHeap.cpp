@@ -28,7 +28,6 @@ namespace rr
 			D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&resource)));
 
 		byte_offset_ = byte_offset_next;
-
 		return resource;
 	}
 }
