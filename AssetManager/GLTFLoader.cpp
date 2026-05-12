@@ -24,11 +24,44 @@
 #include <cstdint>
 #include <vector>
 #include <fstream>
+#include <memory>
+#include <cstddef>
 
 namespace
 {
 	using namespace DirectX;
 	using namespace rr;
+
+
+	struct IndexExtractResult
+	{
+		uint32_t byte_offset = UINT32_MAX;
+		uint32_t byte_stride = 0;
+		uint32_t count = 0;
+	};
+	struct VertexExtractResult
+	{
+		uint32_t base_idx = UINT32_MAX;
+		uint32_t count = 0;
+	};
+
+	struct SurfKey
+	{
+		int16_t normal;
+		int16_t tangent;
+		int16_t uv;
+
+		bool operator==(SurfKey const& other) const = default;
+	};
+
+	struct SkinKey
+	{
+		int16_t joint;
+		int16_t weight;
+
+		bool operator==(SkinKey const& other) const = default;
+	};
+
 
 	class GltfImporter
 	{
@@ -41,42 +74,131 @@ namespace
 			ExtractMaterials(out);
 			ExtractAnimations(out);
 
-
 			return std::make_unique<ModelAsset>(std::move(out));
 		}
+
+		static int32_t FindAttribute(tg3_primitive const& prim, std::string_view name)
+		{
+			for (size_t i{}; i < prim.attributes_count; ++i)
+			{
+				std::string_view key(prim.attributes[i].key.data, prim.attributes[i].key.len);
+				if (key == name) return prim.attributes[i].value;
+			}
+
+			return TG3_INDEX_NONE;
+		}
+
 	private:
+
+		IndexExtractResult ExtractIndices(tg3_primitive const& prim, std::vector<std::byte>& indices);
+		VertexExtractResult ExtractPositions(tg3_primitive const& prim, std::vector<VertexPosition>& positions);
+		VertexExtractResult ExtractSurfaces(tg3_primitive const& prim, std::vector<VertexSurface>& surfaces);
+		VertexExtractResult ExtractSkins(tg3_primitive const& prim, std::vector<VertexSkin>& skins);
+
 		void ExtractMeshes(ModelAsset& out);
 		void ExtractMaterials(ModelAsset& out);
 		void ExtractAnimations(ModelAsset& out);
 
 		tg3_model const* model_{};
+
+
+		std::vector<std::pair<int16_t, IndexExtractResult>> indices_cache_;
+		std::vector<std::pair<int16_t, VertexExtractResult>> pos_cache_;
+		std::vector<std::pair<SurfKey, VertexExtractResult>> surf_cache_;
+		std::vector<std::pair<SkinKey, VertexExtractResult>> skin_cache_;
 	};
+
+	IndexExtractResult GltfImporter::ExtractIndices(tg3_primitive const& prim, std::vector<std::byte>& indices)
+	{
+		int32_t const acc_idx = prim.indices;
+		if (acc_idx < 0) return {};
+
+		for (size_t i{}; i < indices_cache_.size(); ++i)
+		{
+			if (indices_cache_[i].first == acc_idx) return indices_cache_[i].second;
+		}
+
+		tg3_accessor const& acc = model_->accessors[acc_idx];
+		tg3_buffer_view const& view = model_->buffer_views[acc.buffer_view];
+		tg3_buffer const& buf = model_->buffers[view.buffer];
+
+		int32_t const byte_stride = tg3_component_size(acc.component_type); // scalar and tightly packed
+		RR_CHECK(byte_stride > 0);
+
+		IndexExtractResult const result = {
+			.byte_offset = u32(indices.size()),
+			.byte_stride = u32(byte_stride),
+			.count = u32(acc.count)
+		};
+
+		uint8_t const* src = buf.data.data + view.byte_offset + acc.byte_offset;
+		size_t const byte_offset = indices.size();
+		size_t const byte_count = acc.count * byte_stride;
+		indices.resize(indices.size() + byte_count);
+		std::memcpy(indices.data() + byte_offset, src, byte_count);
+
+		indices_cache_.push_back({ i16(acc_idx), result });
+		return result;
+	}
+
+	VertexExtractResult GltfImporter::ExtractPositions(tg3_primitive const& prim, std::vector<VertexPosition>& positions)
+	{
+		int32_t const acc_idx = FindAttribute(prim, "POSITION");
+		RR_CHECK(acc_idx >= 0);
+
+
+		for (size_t i{}; i < pos_cache_.size(); ++i)
+		{
+			if (pos_cache_[i].first == acc_idx) return pos_cache_[i].second;
+		}
+
+		tg3_accessor const& acc = model_->accessors[acc_idx];
+		tg3_buffer_view const& view = model_->buffer_views[acc.buffer_view];
+		tg3_buffer const& buf = model_->buffers[view.buffer];
+
+		int32_t const byte_stride = tg3_accessor_byte_stride(&acc, &view);
+		RR_CHECK(byte_stride > 0);
+
+
+		VertexExtractResult const result = { u32(positions.size()), u32(acc.count) };
+
+		uint8_t const* src = buf.data.data + view.byte_offset + acc.byte_offset;
+		for (size_t i{}; i < acc.count; ++i)
+		{
+			float const* v = reinterpret_cast<float const*>(src + i * byte_stride);
+			positions.push_back({ v[0], v[1], v[2] });
+		}
+
+		pos_cache_.push_back({ i16(acc_idx), result });
+		return result;
+	}
 
 	void GltfImporter::ExtractMeshes(ModelAsset& out)
 	{
-		for (uint32_t mesh_idx{}; model_->meshes_count; ++mesh_idx)
+		for (size_t mesh_idx{}; mesh_idx < model_->meshes_count; ++mesh_idx)
 		{
 			tg3_mesh const& mesh = model_->meshes[mesh_idx];
-			for (uint32_t prim_idx{}; prim_idx < mesh.primitives_count; ++prim_idx)
+			for (size_t prim_idx{}; prim_idx < mesh.primitives_count; ++prim_idx)
 			{
 				tg3_primitive const& prim = mesh.primitives[prim_idx];
 
-				Geometry geo{};
-				geo.index_byte_offset = u32(out.indices.size());
-				geo.position_base_idx = u32(out.positions.size());
-				geo.surface_base_idx = u32(out.surfaces.size());
-				geo.skin_base_idx = u32(out.skins.size());
+				Primitive out_prim = {};
+				auto pos_result = ExtractPositions(prim, out.positions);
+				out_prim.position_base_idx = pos_result.base_idx;
+				out_prim.vertex_count = pos_result.count;
+
+				auto idx_result = ExtractIndices(prim, out.indices);
+				out_prim.index_byte_offset = idx_result.byte_offset;
+				out_prim.index_byte_stride = idx_result.byte_stride;
+				out_prim.index_count = idx_result.count;
 
 				//TODO:
-				//ExtractIndices(...);
-				//ExtractPositions(...);
 				//ExtractSurfaces(...);
 				//ExtractSkins(...);
 
-				out.geometries.push_back(geo);
+				out.primitives.push_back(out_prim);
 			}
 		}
-
 	}
 
 

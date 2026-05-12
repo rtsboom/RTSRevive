@@ -11,6 +11,7 @@ namespace rr
 	template<typename T> constexpr uint8_t  u8(T v) noexcept { return static_cast<uint8_t>(v); }
 	template<typename T> constexpr int64_t  i64(T v) noexcept { return static_cast<int64_t>(v); }
 	template<typename T> constexpr int32_t  i32(T v) noexcept { return static_cast<int32_t>(v); }
+	template<typename T> constexpr int16_t  i16(T v) noexcept { return static_cast<int16_t>(v); }
 	template<typename T> constexpr double   f64(T v) noexcept { return static_cast<double>(v); }
 	template<typename T> constexpr float    f32(T v) noexcept { return static_cast<float>(v); }
 }

@@ -11,9 +11,9 @@ namespace rr
 	using  VertexPosition = DirectX::XMFLOAT3;
 	struct VertexSurface
 	{
-		DirectX::XMFLOAT2 uv;
 		DirectX::PackedVector::XMBYTEN4 normal;
 		DirectX::PackedVector::XMBYTEN4 tangent;
+		DirectX::XMFLOAT2 uv;
 	};
 	struct VertexSkin
 	{
@@ -21,17 +21,6 @@ namespace rr
 		DirectX::PackedVector::XMUBYTE4 weight;
 	};
 
-	struct Geometry
-	{
-		uint32_t index_byte_offset;
-		uint32_t index_byte_stride;
-		uint32_t index_count;
-
-		uint32_t position_base_idx;
-		uint32_t surface_base_idx;
-		uint32_t skin_base_idx;
-		uint32_t vertex_count;
-	};
 
 	struct Material
 	{
@@ -48,7 +37,15 @@ namespace rr
 
 	struct Primitive
 	{
-		uint32_t geometry_idx;
+		uint32_t index_byte_offset;
+		uint32_t index_byte_stride;
+		uint32_t index_count;
+
+		uint32_t position_base_idx;
+		uint32_t surface_base_idx;
+		uint32_t skin_base_idx;
+		uint32_t vertex_count;
+
 		uint32_t material_idx;
 	};
 
@@ -70,7 +67,6 @@ namespace rr
 	struct ModelAsset : AssetBase
 	{
 		uint32_t node_count;
-		std::vector<Geometry>      geometries;
 		std::vector<Material>      materials;
 		std::vector<Primitive>     primitives;
 		std::vector<NodePrimitive> node_primitives;
