@@ -21,6 +21,10 @@ namespace rr
 	using DirectX::XMMatrixRotationQuaternion;
 	using DirectX::XMMatrixTranslation;
 	using DirectX::XMLoadFloat4x4;
+	
+	// DirectXMath PackedVector
+	using DirectX::PackedVector::XMStoreByteN4;
+	using DirectX::PackedVector::XMStoreByte4;
 
 	// DirectXTex
 	using DirectX::ScratchImage;

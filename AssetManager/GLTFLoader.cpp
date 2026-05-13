@@ -23,45 +23,82 @@
 #include <string_view>
 #include <cstdint>
 #include <vector>
-#include <fstream>
 #include <memory>
 #include <cstddef>
+#include <string.h>
 
 namespace
 {
 	using namespace DirectX;
+	using namespace DirectX::PackedVector;
 	using namespace rr;
-
 
 	struct IndexExtractResult
 	{
 		uint32_t byte_offset = UINT32_MAX;
 		uint32_t byte_stride = 0;
-		uint32_t count = 0;
+		uint32_t index_count = 0;
 	};
 	struct VertexExtractResult
 	{
 		uint32_t base_idx = UINT32_MAX;
-		uint32_t count = 0;
+		uint32_t vertex_count = 0;
 	};
 
 	struct SurfKey
 	{
-		int16_t normal;
-		int16_t tangent;
-		int16_t uv;
+		int16_t normal = -1;
+		int16_t tangent = -1;
+		int16_t uv = -1;
 
 		bool operator==(SurfKey const& other) const = default;
+		bool IsNull() const { return normal < 0 && tangent < 0 && uv < 0; }
 	};
 
 	struct SkinKey
 	{
-		int16_t joint;
-		int16_t weight;
+		int16_t joint = -1;
+		int16_t weight = -1;
 
 		bool operator==(SkinKey const& other) const = default;
+		bool IsNull() const { return joint < 0 && weight < 0; }
 	};
 
+	struct AccReader
+	{
+		tg3_accessor const& acc;
+		tg3_buffer_view const& view;
+		tg3_buffer const& buf;
+
+		uint8_t const* src;
+		size_t byte_stride;
+
+		size_t Count() const noexcept { return acc.count; }
+		size_t ByteCountContiguous() const noexcept { return acc.count * byte_stride; }
+
+		template<typename T>
+		T Read(size_t i) const
+		{
+			T v{};
+			std::memcpy(&v, src + i * byte_stride, sizeof(T));
+			return v;
+		}
+
+		void ReadAllContiguous(void* dst) const
+		{
+			std::memcpy(dst, src, ByteCountContiguous());
+		}
+
+		AccReader(tg3_model const* model, int32_t acc_idx)
+			: acc(model->accessors[acc_idx])
+			, view(model->buffer_views[acc.buffer_view])
+			, buf(model->buffers[view.buffer])
+			, src(buf.data.data + view.byte_offset + acc.byte_offset)
+			, byte_stride(tg3_accessor_byte_stride(&acc, &view))
+		{
+			RR_CHECK(byte_stride > 0);
+		}
+	};
 
 	class GltfImporter
 	{
@@ -113,31 +150,26 @@ namespace
 		int32_t const acc_idx = prim.indices;
 		if (acc_idx < 0) return {};
 
+		int16_t const key = i16(acc_idx);
+
 		for (size_t i{}; i < indices_cache_.size(); ++i)
 		{
-			if (indices_cache_[i].first == acc_idx) return indices_cache_[i].second;
+			if (indices_cache_[i].first == key) return indices_cache_[i].second;
 		}
 
-		tg3_accessor const& acc = model_->accessors[acc_idx];
-		tg3_buffer_view const& view = model_->buffer_views[acc.buffer_view];
-		tg3_buffer const& buf = model_->buffers[view.buffer];
+		AccReader const reader(model_, acc_idx);
+		size_t const byte_offset = indices.size();
+		size_t const byte_count = reader.ByteCountContiguous();
+		indices.resize(byte_offset + byte_count);
 
-		int32_t const byte_stride = tg3_component_size(acc.component_type); // scalar and tightly packed
-		RR_CHECK(byte_stride > 0);
+		reader.ReadAllContiguous(indices.data() + byte_offset);
 
 		IndexExtractResult const result = {
-			.byte_offset = u32(indices.size()),
-			.byte_stride = u32(byte_stride),
-			.count = u32(acc.count)
+			.byte_offset = u32(byte_offset),
+			.byte_stride = u32(reader.byte_stride),
+			.index_count = u32(reader.Count())
 		};
-
-		uint8_t const* src = buf.data.data + view.byte_offset + acc.byte_offset;
-		size_t const byte_offset = indices.size();
-		size_t const byte_count = acc.count * byte_stride;
-		indices.resize(indices.size() + byte_count);
-		std::memcpy(indices.data() + byte_offset, src, byte_count);
-
-		indices_cache_.push_back({ i16(acc_idx), result });
+		indices_cache_.push_back({ key, result });
 		return result;
 	}
 
@@ -146,30 +178,206 @@ namespace
 		int32_t const acc_idx = FindAttribute(prim, "POSITION");
 		RR_CHECK(acc_idx >= 0);
 
-
+		int16_t const key = i16(acc_idx);
 		for (size_t i{}; i < pos_cache_.size(); ++i)
 		{
-			if (pos_cache_[i].first == acc_idx) return pos_cache_[i].second;
+			if (pos_cache_[i].first == key) return pos_cache_[i].second;
 		}
 
-		tg3_accessor const& acc = model_->accessors[acc_idx];
-		tg3_buffer_view const& view = model_->buffer_views[acc.buffer_view];
-		tg3_buffer const& buf = model_->buffers[view.buffer];
+		AccReader const reader(model_, acc_idx);
+		size_t const base_idx = positions.size();
+		size_t const vertex_count = reader.Count();
 
-		int32_t const byte_stride = tg3_accessor_byte_stride(&acc, &view);
-		RR_CHECK(byte_stride > 0);
-
-
-		VertexExtractResult const result = { u32(positions.size()), u32(acc.count) };
-
-		uint8_t const* src = buf.data.data + view.byte_offset + acc.byte_offset;
-		for (size_t i{}; i < acc.count; ++i)
+		positions.resize(base_idx + vertex_count);
+		for (size_t i{}; i < vertex_count; ++i)
 		{
-			float const* v = reinterpret_cast<float const*>(src + i * byte_stride);
-			positions.push_back({ v[0], v[1], v[2] });
+			positions[base_idx + i] = reader.Read<XMFLOAT3>(i);
 		}
 
-		pos_cache_.push_back({ i16(acc_idx), result });
+		VertexExtractResult const result =
+		{
+			.base_idx = base_idx,
+			.vertex_count = vertex_count
+		};
+		pos_cache_.push_back({ key, result });
+		return result;
+	}
+
+	VertexExtractResult GltfImporter::ExtractSurfaces(tg3_primitive const& prim, std::vector<VertexSurface>& surfaces)
+	{
+		int32_t const normal_acc_idx = FindAttribute(prim, "NORMAL");
+		int32_t const tangent_acc_idx = FindAttribute(prim, "TANGENT");
+		int32_t const uv_acc_idx = FindAttribute(prim, "TEXCOORD_0");
+		SurfKey const key =
+		{
+			.normal = i16(normal_acc_idx),
+			.tangent = i16(tangent_acc_idx),
+			.uv = i16(uv_acc_idx)
+		};
+
+		if (key.IsNull()) return {};
+
+		for (size_t i{}; i < surf_cache_.size(); ++i)
+		{
+			if (surf_cache_[i].first == key) return surf_cache_[i].second;
+		}
+
+		size_t const base_idx = surfaces.size();
+		size_t vertex_count = 0;
+
+		if (normal_acc_idx >= 0)
+		{
+			AccReader const normal_reader(model_, normal_acc_idx);
+			if (vertex_count == 0)
+			{
+				vertex_count = normal_reader.Count();
+				surfaces.resize(base_idx + vertex_count);
+			}
+
+			RR_CHECK(vertex_count == normal_reader.Count());
+			for (size_t i{}; i < normal_reader.Count(); ++i)
+			{
+				XMFLOAT3 n = normal_reader.Read<XMFLOAT3>(i);
+				XMVECTOR v = XMLoadFloat3(&n);
+				XMStoreByteN4(&surfaces[base_idx + i].normal, v);
+			}
+		}
+
+		if (tangent_acc_idx >= 0)
+		{
+			AccReader const tangent_reader(model_, tangent_acc_idx);
+			if (vertex_count == 0)
+			{
+				vertex_count = tangent_reader.Count();
+				surfaces.resize(base_idx + vertex_count);
+			}
+			RR_CHECK(vertex_count == tangent_reader.Count());
+			for (size_t i{}; i < tangent_reader.Count(); ++i)
+			{
+				XMFLOAT4 t = tangent_reader.Read<XMFLOAT4>(i);
+				XMVECTOR v = XMLoadFloat4(&t);
+				XMStoreByteN4(&surfaces[base_idx + i].tangent, v);
+			}
+		}
+
+		if (uv_acc_idx >= 0)
+		{
+			AccReader const uv_reader(model_, uv_acc_idx);
+			if (vertex_count == 0)
+			{
+				vertex_count = uv_reader.Count();
+				surfaces.resize(base_idx + vertex_count);
+			}
+			RR_CHECK(vertex_count == uv_reader.Count());
+
+			for (size_t i{}; i < uv_reader.Count(); ++i)
+			{
+				surfaces[base_idx + i].uv = uv_reader.Read<XMFLOAT2>(i);
+			}
+		}
+
+		VertexExtractResult const result =
+		{
+			.base_idx = base_idx,
+			.vertex_count = vertex_count
+		};
+		surf_cache_.push_back({ key, result });
+		return result;
+	}
+
+	VertexExtractResult GltfImporter::ExtractSkins(tg3_primitive const& prim, std::vector<VertexSkin>& skins)
+	{
+		int32_t const joint_acc_idx = FindAttribute(prim, "JOINTS_0");
+		int32_t const weight_acc_idx = FindAttribute(prim, "WEIGHTS_0");
+		SkinKey const key =
+		{
+			.joint = i16(joint_acc_idx),
+			.weight = i16(weight_acc_idx),
+		};
+
+		if (key.IsNull()) return {};
+
+		for (size_t i{}; i < skin_cache_.size(); ++i)
+		{
+			if (skin_cache_[i].first == key) return skin_cache_[i].second;
+		}
+
+		AccReader const joint_reader(model_, joint_acc_idx);
+		AccReader const weight_reader(model_, weight_acc_idx);
+		size_t const base_idx = skins.size();
+		size_t const vertex_count = joint_reader.Count();
+		skins.resize(base_idx + vertex_count);
+
+		if (joint_reader.acc.component_type == TG3_COMPONENT_TYPE_UNSIGNED_SHORT)
+		{
+			for (size_t i{}; i < vertex_count; ++i)
+			{
+				XMUSHORT4 j = joint_reader.Read<XMUSHORT4>(i);
+				XMVECTOR v = XMLoadUShort4(&j);
+
+				XMStoreUByte4(&skins[base_idx + i].joint, v);
+			}
+		}
+		else if (joint_reader.acc.component_type == TG3_COMPONENT_TYPE_UNSIGNED_BYTE)
+		{
+			for (size_t i{}; i < vertex_count; ++i)
+			{
+				skins[base_idx + i].joint = joint_reader.Read<XMUBYTE4>(i);
+			}
+		}
+		else
+		{
+			RR_CHECK(false && "Unsupported skin joint component type");
+		}
+
+		// remap joint to node
+		for (size_t i{}; i < vertex_count; ++i)
+		{
+			auto& s = skins[base_idx + i];
+			auto& joints = model_->skins[0].joints;
+			s.joint.x = u8(joints[s.joint.x]);
+			s.joint.y = u8(joints[s.joint.y]);
+			s.joint.z = u8(joints[s.joint.z]);
+			s.joint.w = u8(joints[s.joint.w]);
+		}
+
+		if (weight_reader.acc.component_type == TG3_COMPONENT_TYPE_FLOAT)
+		{
+			for (size_t i{}; i < vertex_count; ++i)
+			{
+				XMFLOAT4 w = weight_reader.Read<XMFLOAT4>(i);
+				XMVECTOR v = XMLoadFloat4(&w);
+				XMStoreUByteN4(&skins[base_idx + i].weight, v);
+			}
+		}
+		else if (weight_reader.acc.component_type == TG3_COMPONENT_TYPE_UNSIGNED_SHORT)
+		{
+			for (size_t i{}; i < vertex_count; ++i)
+			{
+				XMUSHORTN4 w = weight_reader.Read<XMUSHORTN4>(i);
+				XMVECTOR v = XMLoadUShortN4(&w);
+				XMStoreUByteN4(&skins[base_idx + i].weight, v);
+			}
+		}
+		else if (weight_reader.acc.component_type == TG3_COMPONENT_TYPE_UNSIGNED_BYTE)
+		{
+			for (size_t i{}; i < vertex_count; ++i)
+			{
+				XMUBYTEN4 w = weight_reader.Read<XMUBYTEN4>(i);
+				skins[base_idx + i].weight = w;
+			}
+		}
+		else
+		{
+			RR_CHECK(false && "Unsupported skin weight component type");
+		}
+
+		VertexExtractResult const result =
+		{
+			.base_idx = base_idx,
+			.vertex_count = vertex_count
+		};
+		skin_cache_.push_back({ key, result });
 		return result;
 	}
 
@@ -183,18 +391,23 @@ namespace
 				tg3_primitive const& prim = mesh.primitives[prim_idx];
 
 				Primitive out_prim = {};
-				auto pos_result = ExtractPositions(prim, out.positions);
-				out_prim.position_base_idx = pos_result.base_idx;
-				out_prim.vertex_count = pos_result.count;
-
 				auto idx_result = ExtractIndices(prim, out.indices);
 				out_prim.index_byte_offset = idx_result.byte_offset;
 				out_prim.index_byte_stride = idx_result.byte_stride;
-				out_prim.index_count = idx_result.count;
+				out_prim.index_count = idx_result.index_count;
 
-				//TODO:
-				//ExtractSurfaces(...);
-				//ExtractSkins(...);
+				auto pos_result = ExtractPositions(prim, out.positions);
+				out_prim.position_base_idx = pos_result.base_idx;
+				out_prim.vertex_count = pos_result.vertex_count;
+
+				auto surf_result = ExtractSurfaces(prim, out.surfaces);
+				out_prim.surface_base_idx = surf_result.base_idx;
+
+				auto skin_result = ExtractSkins(prim, out.skins);
+				out_prim.skin_base_idx = skin_result.base_idx;
+
+				RR_CHECK(surf_result.vertex_count == 0 || surf_result.vertex_count == out_prim.vertex_count);
+				RR_CHECK(skin_result.vertex_count == 0 || skin_result.vertex_count == out_prim.vertex_count);
 
 				out.primitives.push_back(out_prim);
 			}
@@ -735,7 +948,7 @@ namespace rr
 		tg3_parse_options opts;
 		tg3_parse_options_init(&opts);
 		opts.images_as_is = 1; // Don't decode images
-		opts.image = {};
+		opts.image = {}; // Don't load external images
 		tg3_error_stack errors;
 		tg3_model model;
 		tg3_error_code err = tg3_parse_file(&model, &errors, filename.data(), u32(filename.size()), &opts);

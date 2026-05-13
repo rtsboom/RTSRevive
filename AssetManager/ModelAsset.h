@@ -17,8 +17,8 @@ namespace rr
 	};
 	struct VertexSkin
 	{
-		DirectX::PackedVector::XMUBYTE4 joint;
-		DirectX::PackedVector::XMUBYTE4 weight;
+		DirectX::PackedVector::XMUBYTE4  joint;
+		DirectX::PackedVector::XMUBYTEN4 weight;
 	};
 
 
