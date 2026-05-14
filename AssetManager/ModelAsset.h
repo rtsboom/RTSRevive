@@ -25,9 +25,9 @@ namespace rr
 	struct Material
 	{
 		int base_color_texture_idx = -1;
+		int metallic_roughness_texture_idx = -1;
 		int normal_texture_idx = -1;
 		int occlusion_texture_idx = -1;
-		int metallic_roughness_texture_idx = -1;
 
 		DirectX::XMFLOAT4 base_color_factor = { 1.0f, 1.0f, 1.0f, 1.0f };
 		DirectX::XMFLOAT3 emissive_factor = { 0.0f, 0.0f, 0.0f };

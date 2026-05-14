@@ -3,6 +3,7 @@
 #pragma warning(push, 0)
 #include <d3dx12.h>
 #include <DirectXMath.h> // Windows SDK
+#include <DirectXPackedVector.h>
 #include <DirectXTex.h>  // DirectXTex Nuget Pakage
 #pragma warning(pop)
 namespace rr

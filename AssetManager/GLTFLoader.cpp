@@ -32,6 +32,44 @@ namespace
 	using namespace DirectX;
 	using namespace DirectX::PackedVector;
 	using namespace rr;
+	
+	XMMATRIX GetNodeLocalMatrix(tg3_node const& node)
+	{
+		if (node.has_matrix)
+		{
+			// glTF matrix is column-major.
+			// Copying sequentially into row-major XMFLOAT implicitly transposes it.
+			XMMATRIX m = XMMATRIX(
+				f32(node.matrix[0]), f32(node.matrix[1]), f32(node.matrix[2]), f32(node.matrix[3]),
+				f32(node.matrix[4]), f32(node.matrix[5]), f32(node.matrix[6]), f32(node.matrix[7]),
+				f32(node.matrix[8]), f32(node.matrix[9]), f32(node.matrix[10]), f32(node.matrix[11]),
+				f32(node.matrix[12]), f32(node.matrix[13]), f32(node.matrix[14]), f32(node.matrix[15])
+			);
+
+			return m;
+		}
+
+		// S * R * T
+		XMMATRIX m = XMMatrixIdentity();
+		m *= XMMatrixScaling(
+			f32(node.scale[0]),
+			f32(node.scale[1]),
+			f32(node.scale[2]));
+
+		XMVECTOR q = XMVectorSet(
+			f32(node.rotation[0]),
+			f32(node.rotation[1]),
+			f32(node.rotation[2]),
+			f32(node.rotation[3]));
+		m *= XMMatrixRotationQuaternion(q);
+
+		m *= XMMatrixTranslation(
+			f32(node.translation[0]),
+			f32(node.translation[1]),
+			f32(node.translation[2]));
+
+		return m;
+	}
 
 	struct IndexExtractResult
 	{
@@ -107,6 +145,7 @@ namespace
 		std::unique_ptr<AssetBase> Import()
 		{
 			ModelAsset out{};
+			ExtractNodes(out);
 			ExtractMeshes(out);
 			ExtractMaterials(out);
 			ExtractAnimations(out);
@@ -127,6 +166,11 @@ namespace
 
 	private:
 
+		void BuildNodeHierarchy();
+		void ExtractNodeMatrices(ModelAsset& out);
+		void ExtractNodePrimitives(ModelAsset& out);
+		void ExtractNodes(ModelAsset& out);
+
 		IndexExtractResult ExtractIndices(tg3_primitive const& prim, std::vector<std::byte>& indices);
 		VertexExtractResult ExtractPositions(tg3_primitive const& prim, std::vector<VertexPosition>& positions);
 		VertexExtractResult ExtractSurfaces(tg3_primitive const& prim, std::vector<VertexSurface>& surfaces);
@@ -137,7 +181,8 @@ namespace
 		void ExtractAnimations(ModelAsset& out);
 
 		tg3_model const* model_{};
-
+		std::vector<int32_t> bfs_order_;
+		std::vector<int32_t> node_parent_;
 
 		std::vector<std::pair<int16_t, IndexExtractResult>> indices_cache_;
 		std::vector<std::pair<int16_t, VertexExtractResult>> pos_cache_;
@@ -196,8 +241,8 @@ namespace
 
 		VertexExtractResult const result =
 		{
-			.base_idx = base_idx,
-			.vertex_count = vertex_count
+			.base_idx = u32(base_idx),
+			.vertex_count = u32(vertex_count)
 		};
 		pos_cache_.push_back({ key, result });
 		return result;
@@ -278,8 +323,8 @@ namespace
 
 		VertexExtractResult const result =
 		{
-			.base_idx = base_idx,
-			.vertex_count = vertex_count
+			.base_idx = u32(base_idx),
+			.vertex_count = u32(vertex_count)
 		};
 		surf_cache_.push_back({ key, result });
 		return result;
@@ -334,7 +379,7 @@ namespace
 		for (size_t i{}; i < vertex_count; ++i)
 		{
 			auto& s = skins[base_idx + i];
-			auto& joints = model_->skins[0].joints;
+			auto const& joints = model_->skins[0].joints;
 			s.joint.x = u8(joints[s.joint.x]);
 			s.joint.y = u8(joints[s.joint.y]);
 			s.joint.z = u8(joints[s.joint.z]);
@@ -374,11 +419,92 @@ namespace
 
 		VertexExtractResult const result =
 		{
-			.base_idx = base_idx,
-			.vertex_count = vertex_count
+			.base_idx = u32(base_idx),
+			.vertex_count = u32(vertex_count)
 		};
 		skin_cache_.push_back({ key, result });
 		return result;
+	}
+
+	void GltfImporter::BuildNodeHierarchy()
+	{
+		node_parent_.resize(model_->nodes_count, -1);
+		bfs_order_.reserve(model_->nodes_count);
+
+		std::vector<int32_t> q;
+		q.reserve(model_->nodes_count);
+		size_t q_head{};
+
+		tg3_scene const& scene = model_->scenes[0];
+		for (size_t i{}; i < scene.nodes_count; ++i)
+		{
+			q.push_back(scene.nodes[i]);
+		}
+
+		while (q_head < q.size())
+		{
+			int32_t const node_idx = q[q_head++];
+			bfs_order_.push_back(node_idx);
+			tg3_node const& node = model_->nodes[node_idx];
+			for (size_t i{}; i < node.children_count; ++i)
+			{
+				q.push_back(node.children[i]);
+				node_parent_[q.back()] = node_idx;
+			}
+		}
+	}
+
+	void GltfImporter::ExtractNodeMatrices(ModelAsset& out)
+	{
+		out.node_matrices.resize(model_->nodes_count);
+		for (size_t node_idx : bfs_order_)
+		{
+			tg3_node const& node = model_->nodes[node_idx];
+			int32_t const parent_idx = node_parent_[node_idx];
+			XMMATRIX const local_mat = GetNodeLocalMatrix(node);
+			XMMATRIX const world_mat = (parent_idx >= 0)
+				? local_mat * XMLoadFloat4x4(&out.node_matrices[parent_idx])
+				: local_mat;
+
+			XMStoreFloat4x4(&out.node_matrices[node_idx], world_mat);
+		}
+	}
+
+	void GltfImporter::ExtractNodePrimitives(ModelAsset& out)
+	{
+		std::vector<uint32_t> mesh_prim_offset;
+		mesh_prim_offset.reserve(model_->meshes_count + 1); // +1 to store total primitive count at the end
+		mesh_prim_offset.push_back(0);
+		for (uint32_t i{}; i < model_->meshes_count; ++i)
+		{
+			mesh_prim_offset.push_back(mesh_prim_offset.back() + model_->meshes[i].primitives_count);
+		}
+
+		out.node_primitives.reserve(mesh_prim_offset.back());
+
+		for (uint32_t i{}; i < model_->nodes_count; ++i)
+		{
+			tg3_node const& node = model_->nodes[i];
+			if (node.mesh >= 0)
+			{
+				for (uint32_t j{}; j < model_->meshes[node.mesh].primitives_count; ++j)
+				{
+					NodePrimitive const node_prim = {
+						.node_idx = u16(i),
+						.primitive_idx = u16(mesh_prim_offset[node.mesh] + j)
+					};
+
+					out.node_primitives.push_back(node_prim);
+				}
+			}
+		}
+	}
+
+	void GltfImporter::ExtractNodes(ModelAsset& out)
+	{
+		BuildNodeHierarchy();
+		ExtractNodeMatrices(out);
+		ExtractNodePrimitives(out);
 	}
 
 	void GltfImporter::ExtractMeshes(ModelAsset& out)
@@ -409,11 +535,126 @@ namespace
 				RR_CHECK(surf_result.vertex_count == 0 || surf_result.vertex_count == out_prim.vertex_count);
 				RR_CHECK(skin_result.vertex_count == 0 || skin_result.vertex_count == out_prim.vertex_count);
 
+				out_prim.material_idx = prim.material;
+
 				out.primitives.push_back(out_prim);
 			}
 		}
 	}
 
+	void GltfImporter::ExtractMaterials(ModelAsset& out)
+	{
+		out.materials.resize(model_->materials_count);
+		for (size_t i{}; i < out.materials.size(); ++i)
+		{
+			tg3_material const& mat = model_->materials[i];
+
+			Material out_mat = {};
+
+			const int base_color_tex = mat.pbr_metallic_roughness.base_color_texture.index;
+			if (base_color_tex >= 0)
+			{
+				out_mat.base_color_texture_idx = model_->textures[base_color_tex].source;
+			}
+			const int metallic_roughness_tex = mat.pbr_metallic_roughness.metallic_roughness_texture.index;
+			if (metallic_roughness_tex >= 0)
+			{
+				out_mat.metallic_roughness_texture_idx = model_->textures[metallic_roughness_tex].source;
+			}
+
+			const int normal_tex = mat.normal_texture.index;
+			if (normal_tex >= 0)
+			{
+				out_mat.normal_texture_idx = model_->textures[normal_tex].source;
+			}
+
+			const int occlusion_tex = mat.occlusion_texture.index;
+			if (occlusion_tex >= 0)
+			{
+				out_mat.occlusion_texture_idx = model_->textures[occlusion_tex].source;
+			}
+
+			out_mat.base_color_factor = XMFLOAT4(
+				f32(mat.pbr_metallic_roughness.base_color_factor[0]),
+				f32(mat.pbr_metallic_roughness.base_color_factor[1]),
+				f32(mat.pbr_metallic_roughness.base_color_factor[2]),
+				f32(mat.pbr_metallic_roughness.base_color_factor[3]));
+
+			out_mat.emissive_factor = XMFLOAT3(
+				f32(mat.emissive_factor[0]),
+				f32(mat.emissive_factor[1]),
+				f32(mat.emissive_factor[2]));
+
+			out_mat.metallic_factor = f32(mat.pbr_metallic_roughness.metallic_factor);
+			out_mat.roughness_factor = f32(mat.pbr_metallic_roughness.roughness_factor);
+			out.materials[i] = out_mat;
+
+		}
+	}
+
+	void GltfImporter::ExtractAnimations(ModelAsset& out)
+	{
+		XMFLOAT4X4 const* ibm = nullptr;
+		if (model_->skins_count > 0)
+		{
+			tg3_skin const& skin = model_->skins[0];
+			int32_t const acc_idx = skin.inverse_bind_matrices;
+			RR_CHECK(acc_idx >= 0);
+			auto const& acc = model_->accessors[acc_idx];
+			auto const& view = model_->buffer_views[acc.buffer_view];
+			auto const& buf = model_->buffers[view.buffer];
+
+			ibm = reinterpret_cast<XMFLOAT4X4 const*>(buf.data.data + view.byte_offset + acc.byte_offset);
+		}
+
+		for (size_t i{}; i < model_->animations_count; ++i)
+		{
+			tg3_animation const& anim = model_->animations[i];
+			AnimationClip out_clip = {};
+			out_clip.name = std::string(anim.name.data, anim.name.len);
+			//out_clip.duration = 0.0f;
+			//out_clip.frame_count = 0;
+			//out_clip.node_count = 0;
+			//out_clip.node_matrix_base_idx = 0;
+
+			//anim.channels->target.path;
+			//anim.samplers->input;
+			//anim.samplers->output;
+			
+			for (uint32_t ch_idx{}; ch_idx < anim.channels_count; ++ch_idx)
+			{
+				auto const& channel = anim.channels[ch_idx];
+				auto const& sampler = anim.samplers[channel.sampler];
+				auto const& in_acc = model_->accessors[sampler.input];
+				auto const& in_view = model_->buffer_views[in_acc.buffer_view];
+				auto const& in_buf = model_->buffers[in_view.buffer];
+				float const* in_data = reinterpret_cast<float const*>(in_buf.data.data + in_view.byte_offset + in_acc.byte_offset);
+
+				auto const& out_acc = model_->accessors[sampler.output];
+				auto const& out_view = model_->buffer_views[out_acc.buffer_view];
+				auto const& out_buf = model_->buffers[out_view.buffer];
+
+				if (tg3_str_equals_cstr(channel.target.path, "scale"))
+				{
+					XMFLOAT3 const* out_data = reinterpret_cast<XMFLOAT3 const*>(out_buf.data.data + out_view.byte_offset + out_acc.byte_offset);
+				}
+
+				if (tg3_str_equals_cstr(channel.target.path, "rotation"))
+				{
+					XMFLOAT4 const* out_data = reinterpret_cast<XMFLOAT4 const*>(out_buf.data.data + out_view.byte_offset + out_acc.byte_offset);
+				}
+				if (tg3_str_equals_cstr(channel.target.path, "translation"))
+				{
+					XMFLOAT3 const* out_data = reinterpret_cast<XMFLOAT3 const*>(out_buf.data.data + out_view.byte_offset + out_acc.byte_offset);
+
+				}
+				
+			}
+
+		}
+
+
+	}
 
 	XMMATRIX GetLocalMatrix(tinygltf::Node const& node)
 	{
