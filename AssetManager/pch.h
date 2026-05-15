@@ -1,5 +1,7 @@
 #pragma once
 
+#include <RR_Framework.h>
+
 #pragma warning(push, 0)
 #include <d3dx12.h>
 #include <DirectXMath.h> // Windows SDK

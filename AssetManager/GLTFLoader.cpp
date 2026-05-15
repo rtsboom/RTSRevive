@@ -26,13 +26,14 @@
 #include <memory>
 #include <cstddef>
 #include <string.h>
+#include <algorithm>
 
 namespace
 {
 	using namespace DirectX;
 	using namespace DirectX::PackedVector;
 	using namespace rr;
-	
+
 	XMMATRIX GetNodeLocalMatrix(tg3_node const& node)
 	{
 		if (node.has_matrix)
@@ -178,8 +179,22 @@ namespace
 
 		void ExtractMeshes(ModelAsset& out);
 		void ExtractMaterials(ModelAsset& out);
+
+		struct Transform
+		{
+			XMFLOAT3 s;
+			XMFLOAT4 r;
+			XMFLOAT3 t;
+			XMMATRIX MatrixScale() const { return XMMatrixScaling(s.x, s.y, s.z); }
+			XMMATRIX MatrixRotation() const { return XMMatrixRotationQuaternion(XMLoadFloat4(&r)); }
+			XMMATRIX MatrixTranslation() const { return XMMatrixTranslation(t.x, t.y, t.z); }
+			XMMATRIX Matrix() const { return MatrixScale() * MatrixRotation() * MatrixTranslation(); }
+
+		};
+		void InitRestPoseTransforms(size_t frame_count, std::vector<Transform>& transforms);
 		void ExtractAnimations(ModelAsset& out);
 
+	private:
 		tg3_model const* model_{};
 		std::vector<int32_t> bfs_order_;
 		std::vector<int32_t> node_parent_;
@@ -592,68 +607,138 @@ namespace
 		}
 	}
 
+	void GltfImporter::InitRestPoseTransforms(size_t frame_count, std::vector<Transform>& transforms)
+	{
+		size_t const node_count = model_->nodes_count;
+
+		transforms.resize(frame_count * node_count);
+		for (size_t node_i{}; node_i < node_count; ++node_i)
+		{
+			auto const& node = model_->nodes[node_i];
+			Transform const transform = {
+				.s = XMFLOAT3(f32(node.scale[0]), f32(node.scale[1]), f32(node.scale[2])),
+				.r = XMFLOAT4(f32(node.rotation[0]), f32(node.rotation[1]), f32(node.rotation[2]), f32(node.rotation[3])),
+				.t = XMFLOAT3(f32(node.translation[0]), f32(node.translation[1]), f32(node.translation[2]))
+			};
+
+			transforms[node_i] = transform;
+		}
+
+		for (size_t frame_i{ 1 }; frame_i < frame_count; ++frame_i)
+		{
+			std::copy(
+				transforms.begin(),
+				transforms.begin() + node_count,
+				transforms.begin() + frame_i * node_count);
+		}
+	}
+
 	void GltfImporter::ExtractAnimations(ModelAsset& out)
 	{
-		XMFLOAT4X4 const* ibm = nullptr;
+		size_t const node_count = model_->nodes_count;
+		XMFLOAT4X4 const* inv_bind_matrices = nullptr;
 		if (model_->skins_count > 0)
 		{
 			tg3_skin const& skin = model_->skins[0];
-			int32_t const acc_idx = skin.inverse_bind_matrices;
-			RR_CHECK(acc_idx >= 0);
-			auto const& acc = model_->accessors[acc_idx];
-			auto const& view = model_->buffer_views[acc.buffer_view];
-			auto const& buf = model_->buffers[view.buffer];
-
-			ibm = reinterpret_cast<XMFLOAT4X4 const*>(buf.data.data + view.byte_offset + acc.byte_offset);
+			int32_t const ibm_acc_idx = skin.inverse_bind_matrices;
+			if (ibm_acc_idx >= 0)
+			{
+				AccReader const ibm_reader(model_, ibm_acc_idx);
+				inv_bind_matrices = reinterpret_cast<XMFLOAT4X4 const*>(ibm_reader.src);
+			}
 		}
 
+		size_t max_frame_count = 0;
+		size_t matrix_base_idx = out.node_matrices.size();
 		for (size_t i{}; i < model_->animations_count; ++i)
 		{
-			tg3_animation const& anim = model_->animations[i];
+			auto const& anim = model_->animations[i];
+			RR_CHECK(anim.samplers_count > 0);
+			auto const& sampler = anim.samplers[0];
+			AccReader const sampler_in_reader(model_, sampler.input);
+			float const* timestamps = reinterpret_cast<float const*>(sampler_in_reader.src);
+
 			AnimationClip out_clip = {};
 			out_clip.name = std::string(anim.name.data, anim.name.len);
-			//out_clip.duration = 0.0f;
-			//out_clip.frame_count = 0;
-			//out_clip.node_count = 0;
-			//out_clip.node_matrix_base_idx = 0;
+			out_clip.duration = timestamps[sampler_in_reader.Count() - 1];
+			out_clip.frame_count = u32(sampler_in_reader.Count());
+			out_clip.node_count = u32(node_count);
+			out_clip.node_matrix_base_idx = u32(matrix_base_idx);
+			matrix_base_idx += sz(out_clip.frame_count) * out_clip.node_count;
+			max_frame_count = std::max(max_frame_count, sz(out_clip.frame_count));
+		}
+		out.node_matrices.resize(matrix_base_idx);
 
-			//anim.channels->target.path;
-			//anim.samplers->input;
-			//anim.samplers->output;
-			
+		std::vector<Transform> transforms;
+		for (size_t i{}; i < model_->animations_count; ++i)
+		{
+			InitRestPoseTransforms(max_frame_count, transforms);
+			auto const& anim = model_->animations[i];
+			auto const& clip = out.animations[i];
 			for (uint32_t ch_idx{}; ch_idx < anim.channels_count; ++ch_idx)
 			{
 				auto const& channel = anim.channels[ch_idx];
 				auto const& sampler = anim.samplers[channel.sampler];
-				auto const& in_acc = model_->accessors[sampler.input];
-				auto const& in_view = model_->buffer_views[in_acc.buffer_view];
-				auto const& in_buf = model_->buffers[in_view.buffer];
-				float const* in_data = reinterpret_cast<float const*>(in_buf.data.data + in_view.byte_offset + in_acc.byte_offset);
+				auto const& sampler_in_reader = AccReader(model_, sampler.input);
+				auto const& sampler_out_reader = AccReader(model_, sampler.output);
 
-				auto const& out_acc = model_->accessors[sampler.output];
-				auto const& out_view = model_->buffer_views[out_acc.buffer_view];
-				auto const& out_buf = model_->buffers[out_view.buffer];
 
+				RR_CHECK(channel.target.node >= 0);
 				if (tg3_str_equals_cstr(channel.target.path, "scale"))
 				{
-					XMFLOAT3 const* out_data = reinterpret_cast<XMFLOAT3 const*>(out_buf.data.data + out_view.byte_offset + out_acc.byte_offset);
+					XMFLOAT3 const* scales = reinterpret_cast<XMFLOAT3 const*>(sampler_out_reader.src);
+					for (size_t frame_i{}; frame_i < clip.frame_count; ++frame_i)
+					{
+						transforms[frame_i * clip.node_count + channel.target.node].s = scales[frame_i];
+					}
 				}
 
 				if (tg3_str_equals_cstr(channel.target.path, "rotation"))
 				{
-					XMFLOAT4 const* out_data = reinterpret_cast<XMFLOAT4 const*>(out_buf.data.data + out_view.byte_offset + out_acc.byte_offset);
+					XMFLOAT4 const* rotations = reinterpret_cast<XMFLOAT4 const*>(sampler_out_reader.src);
+					for (size_t frame_i{}; frame_i < clip.frame_count; ++frame_i)
+					{
+						transforms[frame_i * clip.node_count + channel.target.node].r = rotations[frame_i];
+					}
 				}
+
 				if (tg3_str_equals_cstr(channel.target.path, "translation"))
 				{
-					XMFLOAT3 const* out_data = reinterpret_cast<XMFLOAT3 const*>(out_buf.data.data + out_view.byte_offset + out_acc.byte_offset);
-
+					XMFLOAT3 const* translations = reinterpret_cast<XMFLOAT3 const*>(sampler_out_reader.src);
+					for (size_t frame_i{}; frame_i < clip.frame_count; ++frame_i)
+					{
+						transforms[frame_i * clip.node_count + channel.target.node].t = translations[frame_i];
+					}
 				}
-				
 			}
 
+			for (size_t frame_i{}; frame_i < clip.frame_count; ++frame_i)
+			{
+				size_t const frame_matrix_base_idx = clip.node_matrix_base_idx + frame_i * node_count;
+				for (size_t node_i : bfs_order_)
+				{
+					int32_t const parent_i = node_parent_[node_i];
+					XMMATRIX M = transforms[frame_i * node_count + node_i].Matrix();
+					if (parent_i >= 0)
+					{
+						M *= XMLoadFloat4x4(&out.node_matrices[frame_matrix_base_idx + parent_i]);
+					}
+					XMLoadFloat4x4(&out.node_matrices[frame_matrix_base_idx + node_i]);
+				}
+
+				auto const& skin = model_->skins[0];
+				for (size_t joint_i{}; joint_i < skin.joints_count; ++joint_i)
+				{
+					XMMATRIX M = XMMatrixIdentity();
+					if (inv_bind_matrices) M = XMLoadFloat4x4(&inv_bind_matrices[joint_i]);
+
+					size_t const node_i = skin.joints[joint_i];
+					XMFLOAT4X4& out_matrix = out.node_matrices[frame_matrix_base_idx + node_i];
+					M *= XMLoadFloat4x4(&out_matrix);
+					XMStoreFloat4x4(&out_matrix, M);
+				}
+			}
 		}
-
-
 	}
 
 	XMMATRIX GetLocalMatrix(tinygltf::Node const& node)
