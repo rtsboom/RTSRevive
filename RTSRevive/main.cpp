@@ -1,5 +1,14 @@
 #include "pch.h"
 #include "Application.h"
+#include <AssetManager/GLTFLoader.h>
+#include <filesystem>
+void test_gltf_loader()
+{
+	std::filesystem::path modelpath("Assets\\Models\\kenney_mini_arena\\character-soldier.glb");
+	auto model = rr::ImportGLTF(modelpath.string());
+	__debugbreak();
+}
+
 
 #include <combaseapi.h>
 #include <DirectXMath.h>
@@ -15,6 +24,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow)
 {
+	test_gltf_loader();
+	
+
 	if (!DirectX::XMVerifyCPUSupport())return 1;
 	if (FAILED(CoInitializeEx(nullptr, COINIT_MULTITHREADED))) return 1;
 

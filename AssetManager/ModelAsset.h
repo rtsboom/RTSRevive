@@ -64,6 +64,13 @@ namespace rr
 		uint32_t    node_matrix_base_idx;
 	};
 
+	struct ImageSource
+	{
+		std::unique_ptr<std::byte[]> data;
+		uint32_t    len;
+		bool        is_path;
+	};
+
 	struct ModelAsset : AssetBase
 	{
 		uint32_t node_count;
@@ -78,6 +85,6 @@ namespace rr
 		std::vector<std::byte>		     indices;
 		std::vector<DirectX::XMFLOAT4X4> node_matrices;
 
-		std::vector<std::string> image_paths;
+		std::vector<ImageSource> images;
 	};
 }

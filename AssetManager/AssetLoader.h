@@ -35,8 +35,8 @@ namespace rr
 		};
 
 	public:
-		AssetLoader();
-		~AssetLoader();
+		AssetLoader() = default;
+		~AssetLoader() = default;
 		AssetLoader(AssetLoader const&) = delete;
 		AssetLoader& operator=(AssetLoader const&) = delete;
 		AssetLoader(AssetLoader&&) = delete;
