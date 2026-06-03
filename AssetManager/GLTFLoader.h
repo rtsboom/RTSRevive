@@ -1,5 +1,4 @@
 #pragma once
-#include "StagingModel.h"
 #include <string>
 #include <memory>
 #include "AssetBase.h"

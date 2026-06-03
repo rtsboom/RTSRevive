@@ -17,6 +17,7 @@
     <ClCompile Include="GPUBumpBuffer.cpp">
       <Filter>GPU</Filter>
     </ClCompile>
+    <ClCompile Include="JobSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EnginePch.h" />
@@ -33,6 +34,7 @@
     <ClInclude Include="GPUBumpBuffer.h">
       <Filter>GPU</Filter>
     </ClInclude>
+    <ClInclude Include="JobSystem.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="GPU">

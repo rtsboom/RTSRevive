@@ -8,12 +8,8 @@
 
 #include <DirectXMath.h>
 
-#include <Windows.h>
 #include <utility>
-#include <filesystem>
-#include <stdexcept>
 #include <string>
-#include <string_view>
 #include <cstdint>
 #include <vector>
 #include <memory>

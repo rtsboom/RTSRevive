@@ -146,6 +146,7 @@
     <ClCompile Include="GPUBumpHeap.cpp" />
     <ClCompile Include="GPUDevice.cpp" />
     <ClCompile Include="GPURegistry.cpp" />
+    <ClCompile Include="JobSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EnginePch.h" />
@@ -153,6 +154,7 @@
     <ClInclude Include="GPUBumpHeap.h" />
     <ClInclude Include="GPUDevice.h" />
     <ClInclude Include="GPURegistry.h" />
+    <ClInclude Include="JobSystem.h" />
     <ClInclude Include="SimpleEvent.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

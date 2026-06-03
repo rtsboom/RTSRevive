@@ -1,11 +1,13 @@
 #include "pch.h"
 #include "Application.h"
 #include <AssetManager/GLTFLoader.h>
+#include <AssetManager/ModelAsset.h>
 #include <filesystem>
 void test_gltf_loader()
 {
-	std::filesystem::path modelpath("Assets\\Models\\kenney_mini_arena\\character-soldier.glb");
-	auto model = rr::ImportGLTF(modelpath.string());
+	std::filesystem::path modelpath("Assets/Models/kenney_mini_arena/character-soldier.glb");
+	auto asset = rr::ImportGLTF(modelpath.string());
+	auto& model = static_cast<rr::ModelAsset&>(*asset);
 	__debugbreak();
 }
 
@@ -34,10 +36,10 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 	RECT rc = { 0, 0, 1280, 720 };
 	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
-	const int w = rc.right - rc.left;
-	const int h = rc.bottom - rc.top;
-	const int x = (GetSystemMetrics(SM_CXSCREEN) - w) / 2;
-	const int y = (GetSystemMetrics(SM_CYSCREEN) - h) / 2;
+	int const w = rc.right - rc.left;
+	int const h = rc.bottom - rc.top;
+	int const x = (GetSystemMetrics(SM_CXSCREEN) - w) / 2;
+	int const y = (GetSystemMetrics(SM_CYSCREEN) - h) / 2;
 
 
 
