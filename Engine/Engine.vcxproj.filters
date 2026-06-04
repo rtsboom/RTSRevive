@@ -17,7 +17,10 @@
     <ClCompile Include="GPUBumpBuffer.cpp">
       <Filter>GPU</Filter>
     </ClCompile>
-    <ClCompile Include="JobSystem.cpp" />
+    <ClCompile Include="JobSystem.cpp">
+      <Filter>Job</Filter>
+    </ClCompile>
+    <ClCompile Include="WorkStealingQueue.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EnginePch.h" />
@@ -34,11 +37,20 @@
     <ClInclude Include="GPUBumpBuffer.h">
       <Filter>GPU</Filter>
     </ClInclude>
-    <ClInclude Include="JobSystem.h" />
+    <ClInclude Include="Job.h">
+      <Filter>Job</Filter>
+    </ClInclude>
+    <ClInclude Include="JobSystem.h">
+      <Filter>Job</Filter>
+    </ClInclude>
+    <ClInclude Include="WorkStealingQueue.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="GPU">
       <UniqueIdentifier>{bf1c35ec-30bd-40ba-8d57-606f65a877a0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Job">
+      <UniqueIdentifier>{596228e8-ca10-4d73-aabc-a302f9b39b60}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

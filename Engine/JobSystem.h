@@ -4,18 +4,18 @@
 #include <cstddef>
 namespace rr
 {
-	constexpr uint16_t JobID_Null = UINT16_MAX;
 	using JobID = uint16_t;
-	using JobFn = void(*)(struct Job* self);
+	constexpr JobID JobID_Null = UINT16_MAX;
+	using JobFn = void(*)(JobID id, void* data);
 	struct alignas(64) Job
 	{
 		JobFn fn;
-		void* context;
+
 		void* data;
 		JobID parent;
 		JobID continuation;
 		std::atomic_uint32_t unfinished_jobs;
-		alignas(32) std::byte inline_data[32];
+		alignas(8) std::byte inline_data[40];
 	};
 	static_assert(sizeof(Job) == 64);
 	static_assert(alignof(Job) == 64);
@@ -24,8 +24,10 @@ namespace rr
 
 	namespace JobSystem
 	{
-		constexpr uint32_t kJobsPerWorker = 1024;
-		constexpr uint32_t kJobQueueMask = kJobsPerWorker - 1;
+		constexpr uint64_t kJobsPerWorker = 1024;
+		constexpr uint64_t kJobQueueMask = kJobsPerWorker - 1;
+		static_assert((kJobsPerWorker & (kJobsPerWorker - 1)) == 0, "kJobsPerWorker must be a power of two");
+
 
 
 		void Initialize(uint32_t worker_count);
