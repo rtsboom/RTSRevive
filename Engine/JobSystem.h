@@ -35,4 +35,11 @@ namespace rr
 
 		void RunJob(JobID id);
 	}
+
+	// TODO: convert namespace to class
+	class CJobSystem
+	{
+	public:
+		Job* CreateJob();
+	};
 }

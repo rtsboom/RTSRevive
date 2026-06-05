@@ -146,6 +146,7 @@
     <ClCompile Include="GPUBumpHeap.cpp" />
     <ClCompile Include="GPUDevice.cpp" />
     <ClCompile Include="GPURegistry.cpp" />
+    <ClCompile Include="JobPool.cpp" />
     <ClCompile Include="JobSystem.cpp" />
     <ClCompile Include="WorkStealingQueue.cpp" />
   </ItemGroup>
@@ -156,6 +157,7 @@
     <ClInclude Include="GPUDevice.h" />
     <ClInclude Include="GPURegistry.h" />
     <ClInclude Include="Job.h" />
+    <ClInclude Include="JobPool.h" />
     <ClInclude Include="JobSystem.h" />
     <ClInclude Include="SimpleEvent.h" />
     <ClInclude Include="WorkStealingQueue.h" />

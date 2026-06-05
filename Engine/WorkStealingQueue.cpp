@@ -27,7 +27,6 @@ namespace rr
 		bottom_.store(--b, std::memory_order_relaxed);
 
 		std::atomic_thread_fence(std::memory_order_seq_cst);
-
 		int64_t t = top_.load(std::memory_order_relaxed);
 
 		if (t <= b)
@@ -35,7 +34,10 @@ namespace rr
 			Job* job = buffer_[b & capacity_mask_];
 			if (t == b)
 			{
-				if (!top_.compare_exchange_strong(t, t + 1, std::memory_order_acq_rel, std::memory_order_relaxed))
+				if (!top_.compare_exchange_strong(
+					t, t + 1,
+					std::memory_order_acq_rel, 
+					std::memory_order_relaxed))
 				{
 					job = nullptr;
 				}
@@ -50,20 +52,20 @@ namespace rr
 	}
 	Job* WorkStealingQueue::Steal()
 	{
-		int64_t t = top_.load(std::memory_order_relaxed);
-
-		std::atomic_thread_fence(std::memory_order_seq_cst);
-
+		int64_t t = top_.load(std::memory_order_acquire);
 		int64_t b = bottom_.load(std::memory_order_acquire);
 
-		if (t < b)
+		if (t < b) // empty queue
 		{
 			Job* job = buffer_[t & capacity_mask_];
-			if (!top_.compare_exchange_strong(t, t + 1, std::memory_order_acq_rel, std::memory_order_relaxed))
+
+			if (top_.compare_exchange_strong(
+				t, t + 1,
+				std::memory_order_acq_rel,
+				std::memory_order_relaxed))
 			{
-				return nullptr;
+				return job;
 			}
-			return job;
 		}
 
 		return nullptr;

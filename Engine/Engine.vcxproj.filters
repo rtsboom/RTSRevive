@@ -20,7 +20,12 @@
     <ClCompile Include="JobSystem.cpp">
       <Filter>Job</Filter>
     </ClCompile>
-    <ClCompile Include="WorkStealingQueue.cpp" />
+    <ClCompile Include="WorkStealingQueue.cpp">
+      <Filter>Job</Filter>
+    </ClCompile>
+    <ClCompile Include="JobPool.cpp">
+      <Filter>Job</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EnginePch.h" />
@@ -43,7 +48,12 @@
     <ClInclude Include="JobSystem.h">
       <Filter>Job</Filter>
     </ClInclude>
-    <ClInclude Include="WorkStealingQueue.h" />
+    <ClInclude Include="WorkStealingQueue.h">
+      <Filter>Job</Filter>
+    </ClInclude>
+    <ClInclude Include="JobPool.h">
+      <Filter>Job</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="GPU">
