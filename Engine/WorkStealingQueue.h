@@ -1,10 +1,10 @@
 #pragma once
-#include "Job.h"
 
 #include <atomic>
 #include <vector>
 namespace rr
 {
+	struct Job;
 	class WorkStealingQueue
 	{
 	public:

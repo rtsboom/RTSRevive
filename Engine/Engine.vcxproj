@@ -160,6 +160,7 @@
     <ClInclude Include="JobPool.h" />
     <ClInclude Include="JobSystem.h" />
     <ClInclude Include="SimpleEvent.h" />
+    <ClInclude Include="SPMCQueue.h" />
     <ClInclude Include="WorkStealingQueue.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

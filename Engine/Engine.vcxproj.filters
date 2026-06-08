@@ -54,6 +54,9 @@
     <ClInclude Include="JobPool.h">
       <Filter>Job</Filter>
     </ClInclude>
+    <ClInclude Include="SPMCQueue.h">
+      <Filter>Job</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="GPU">
