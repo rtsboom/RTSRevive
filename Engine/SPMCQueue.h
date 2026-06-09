@@ -1,23 +1,24 @@
 #pragma once
+#include <type_traits>
 #include <atomic>
 #include <vector>
-#include <cassert>
 #include <cstdint>
 namespace rr
 {
-	template <typename T>
+	template <typename T, uint64_t Capacity>
 	class SPMCQueue
 	{
+		static constexpr uint64_t capacity_ = Capacity;
+		static constexpr uint64_t capacity_mask_ = Capacity - 1;
+		static_assert(capacity_ > 0 && (capacity_ & capacity_mask_) == 0, "Capacity must be a power of two");
+		static_assert(std::is_trivially_copyable_v<T>);
+
 	public:
-		SPMCQueue(uint64_t capacity)
-			: capacity_{ capacity }
-			, capacity_mask_{ capacity - 1 }
-			, head_{ 0 }
+		SPMCQueue()
+			: head_{ 0 }
 			, tail_{ 0 }
 		{
-			assert((capacity & capacity_mask_) == 0); // capacity must be a power of two
-
-			buffer_.resize(capacity);
+			buffer_.resize(capacity_);
 		}
 
 		bool Push(T const& value)
@@ -60,8 +61,6 @@ namespace rr
 
 	private:
 		std::vector<T> buffer_;
-		uint64_t capacity_;
-		uint64_t capacity_mask_;
 		alignas(64) std::atomic_uint64_t head_;
 		alignas(64) std::atomic_uint64_t tail_;
 	};
