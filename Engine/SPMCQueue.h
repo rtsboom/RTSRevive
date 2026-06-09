@@ -25,8 +25,7 @@ namespace rr
 			uint64_t const t = tail_.load(std::memory_order_relaxed);
 			uint64_t const h = head_.load(std::memory_order_acquire);
 
-			if ((t - h) >= capacity_)
-				return false; // full
+			if ((t - h) == capacity_) return false; // full
 
 			uint64_t const index = t & capacity_mask_;
 			buffer_[index] = value;
@@ -38,13 +37,12 @@ namespace rr
 		bool Pop(T& out)
 		{
 			uint64_t h = head_.load(std::memory_order_relaxed);
-			
+
 			for (;;)
 			{
 				uint64_t const t = tail_.load(std::memory_order_acquire);
 
-				if (h >= t)
-					return false; // empty
+				if ((t - h) == 0) return false; // empty
 
 				uint64_t const index = h & capacity_mask_;
 				T value = buffer_[index];

@@ -20,9 +20,6 @@
     <ClCompile Include="JobSystem.cpp">
       <Filter>Job</Filter>
     </ClCompile>
-    <ClCompile Include="WorkStealingQueue.cpp">
-      <Filter>Job</Filter>
-    </ClCompile>
     <ClCompile Include="JobPool.cpp">
       <Filter>Job</Filter>
     </ClCompile>

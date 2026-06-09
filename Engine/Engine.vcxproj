@@ -148,7 +148,6 @@
     <ClCompile Include="GPURegistry.cpp" />
     <ClCompile Include="JobPool.cpp" />
     <ClCompile Include="JobSystem.cpp" />
-    <ClCompile Include="WorkStealingQueue.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EnginePch.h" />
