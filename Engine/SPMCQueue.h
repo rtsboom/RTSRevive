@@ -25,8 +25,9 @@ namespace rr
 		{
 			uint64_t const t = tail_.load(std::memory_order_relaxed);
 			uint64_t const h = head_.load(std::memory_order_acquire);
+			uint64_t const size = t - h;
 
-			if ((t - h) == capacity_) return false; // full
+			if (size >= capacity_) return false; // full
 
 			uint64_t const index = t & capacity_mask_;
 			buffer_[index] = value;
@@ -42,8 +43,9 @@ namespace rr
 			for (;;)
 			{
 				uint64_t const t = tail_.load(std::memory_order_acquire);
+				uint64_t const size = t - h;
 
-				if ((t - h) == 0) return false; // empty
+				if (size == 0 || size > capacity_) return false; // empty
 
 				uint64_t const index = h & capacity_mask_;
 				T value = buffer_[index];
