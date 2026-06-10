@@ -4,6 +4,7 @@
 #include <vector>
 #include <atomic>
 #include <cstdint>
+#include "SPMCQueue.h"
 
 
 namespace rr
@@ -16,21 +17,19 @@ namespace rr
 
 	class JobPool
 	{
+		static constexpr size_t jobs_per_chunk_ = 128;
+		static constexpr size_t total_chunks_ = 256;
 	public:
-		JobPool(size_t jobs_per_chunk, size_t total_chunks);
+		JobPool();
 
 		JobChunk* AllocateChunk();
 		Job* GetJob(JobID job_idx) noexcept { return &jobs_[job_idx]; }
 
 	private:
-		size_t jobs_per_chunk_;
-		size_t total_chunks_;
-		std::atomic_uint32_t free_chunk_idx;
-
-
-
 		std::vector<Job> jobs_;
 		std::vector<JobChunk> chunks_;
+
+		SPMCQueue<uint32_t, total_chunks_> free_chunks;
 	};
 }
 

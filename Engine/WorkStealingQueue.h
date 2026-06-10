@@ -27,7 +27,7 @@ namespace rr
 			uint64_t const t = top_.load(std::memory_order_acquire);
 
 			uint64_t const size = b - t;
-			if (size == capacity_) return false; // full
+			if (size >= capacity_) return false; // full
 
 			uint64_t const index = b & capacity_mask_;
 			buffer_[index] = value;
@@ -43,9 +43,10 @@ namespace rr
 			bottom_.store(b - 1, std::memory_order_relaxed);
 
 			std::atomic_thread_fence(std::memory_order_seq_cst);
-			uint64_t t = top_.load(std::memory_order_relaxed);
 
-			if ((b - t) == 0) // empty 
+			uint64_t       t = top_.load(std::memory_order_relaxed);
+			uint64_t const size = b - t;
+			if (size == 0 || size > capacity_) // empty 
 			{
 				bottom_.store(b, std::memory_order_relaxed);
 				return false;
@@ -54,7 +55,7 @@ namespace rr
 			uint64_t const index = (b - 1) & capacity_mask_;
 			T value = buffer_[index];
 
-			if ((b - t) == 1) // last item, must contend with stealers
+			if (size == 1) // last item, must contend with stealers
 			{
 				bool result{ false };
 				if (top_.compare_exchange_strong(
@@ -76,10 +77,11 @@ namespace rr
 
 		bool Steal(T& out)
 		{
-			uint64_t t = top_.load(std::memory_order_acquire);
-			uint64_t b = bottom_.load(std::memory_order_acquire);
+			uint64_t       t = top_.load(std::memory_order_acquire);
+			uint64_t const b = bottom_.load(std::memory_order_acquire);
 
-			if ((b - t) == 0) return false; // empty
+			uint64_t const size = b - t;
+			if (size == 0 || size > capacity_) return false; // empty
 
 
 			uint64_t const index = t & capacity_mask_;
