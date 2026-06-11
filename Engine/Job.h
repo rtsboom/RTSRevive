@@ -6,7 +6,7 @@
 
 namespace rr
 {
-	using JobID = uint32_t;
+	using JobID = uint16_t;
 
 	struct alignas(64) Job
 	{
@@ -43,6 +43,6 @@ namespace rr
 			return ::new (static_cast<void*>(data)) T(std::forward<Args>(args)...);
 		}
 	};
-
+	static_assert(alignof(Job) == 64);
 	static_assert(sizeof(Job) == 128);
 }
