@@ -60,7 +60,7 @@ namespace rr
 
 			return job_index;
 		}
-		Job* GetJob(JobID job_index) noexcept
+		Job* GetJob(JobID job_index) const noexcept
 		{
 			if (job_index >= total_jobs_)
 				return nullptr;
@@ -71,7 +71,7 @@ namespace rr
 	private:
 		std::unique_ptr<Job[]> jobs_;
 		uint32_t frame_chunk_begin_{ 0 };
-		std::atomic_uint32_t chunk_offset_{ 0 };
+		std::atomic_uint32_t alignas(64) chunk_offset_{ 0 };
 	};
 }
 
