@@ -3,10 +3,9 @@
 #include "Job.h"
 #include <thread>
 #include <cstdint>
-#include <mutex>
-#include <cstdlib>
 #include <cassert>
 #include <memory>
+#include <Windows.h>
 
 static uint64_t XorShift64(uint64_t& state)
 {
@@ -31,23 +30,32 @@ namespace rr
 	}
 	void JobSystem::WorkerThreadLoop(Worker* worker)
 	{
-		tls_current_worker_ = worker;
+		tls_self_ = worker;
+
+		constexpr uint32_t spin_threshold{ 64 };
+		uint32_t spin{ 0 };
 		while (running_.load(std::memory_order_acquire))
 		{
-			JobID job_id = AcquireJob();
-			if (job_id != JobID_Null)
+			if (ProcessOneJob())
 			{
-				ExecuteJob(job_id);
+				spin = 0;
 				continue;
 			}
 
-			std::unique_lock lock(sleep_mutex_);
-			sleep_cv_.wait(lock, [&]
-				{
-					return !running_.load(std::memory_order_relaxed);
-				});
+			++spin;
+			if (spin < spin_threshold)
+			{
+				_mm_pause();
+				continue;
+			}
 
+			spin = 0;
+			sleeping_workers_.fetch_add(1, std::memory_order_relaxed);
+			if (!ProcessOneJob() &&
+				running_.load(std::memory_order_acquire))
+				smph_.acquire();
 
+			sleeping_workers_.fetch_sub(1, std::memory_order_relaxed);
 		}
 	}
 
@@ -56,18 +64,17 @@ namespace rr
 		worker_count_ = worker_thread_count + 1;
 		workers_ = std::make_unique<Worker[]>(worker_thread_count + 1);
 
-		tls_current_worker_ = &workers_[worker_thread_count];
-		tls_current_worker_->worker_id = worker_thread_count;
-		tls_current_worker_->rng_state = worker_thread_count + 1;
+		tls_self_ = &workers_[worker_thread_count];
+		tls_self_->worker_id = worker_thread_count;
+		tls_self_->rng_state = worker_thread_count + 1;
 
 		running_.store(true, std::memory_order_release);
 
-		worker_threads_.reserve(worker_thread_count);
 		for (size_t i{}; i < worker_thread_count; ++i)
 		{
 			workers_[i].worker_id = i;
 			workers_[i].rng_state = i + 1;
-			worker_threads_.emplace_back(&JobSystem::WorkerThreadLoop, this, &workers_[i]);
+			workers_[i].thread = std::thread(&JobSystem::WorkerThreadLoop, this, &workers_[i]);
 		}
 
 	}
@@ -75,46 +82,50 @@ namespace rr
 	void JobSystem::Shutdown()
 	{
 		running_.store(false, std::memory_order_release);
-		sleep_cv_.notify_all();
 
-		for (auto& thread : worker_threads_)
+		int32_t const sleepers = sleeping_workers_.load(std::memory_order_relaxed);
+		for (size_t i{}; i < sleepers; ++i)
+			smph_.release();
+
+		for (size_t i{}; i < worker_count_; ++i)
 		{
-			if (thread.joinable())
-			{
-				thread.join();
-			}
+			auto& worker_thread = workers_[i].thread;
+			if (worker_thread.joinable()) // last one is main worker, blank thread
+				worker_thread.join();
 		}
 	}
 
-	JobID JobSystem::AcquireJob()
+	bool JobSystem::AcquireJob(JobID& id)
 	{
-		JobID job_id;
-		if (tls_current_worker_->queue.Pop(job_id))
-		{
-			return job_id;
-		}
+		if (tls_self_->queue.Pop(id))
+			return true;
 
-		if (worker_count_ <= 1) // main thread only
-		{
-			return JobID_Null;
-		}
+		uint64_t const random = XorShift64(tls_self_->rng_state);
 
-
-		uint64_t const random = XorShift64(tls_current_worker_->rng_state);
-		
 		for (size_t i{}; i < worker_count_; ++i)
 		{
 			size_t const victim = (random + i) % worker_count_;
-			if (victim == tls_current_worker_->worker_id)
+			if (victim == tls_self_->worker_id)
 				continue;
 
-			if (workers_[victim].queue.Steal(job_id))
-			{
-				return job_id;
-			}
+			if (workers_[victim].queue.Steal(id))
+				return true;
 		}
 
-		return JobID_Null;
+		return false;
+	}
+
+	bool JobSystem::ProcessOneJob()
+	{
+		JobID id;
+
+		if (AcquireJob(id))
+		{
+			ExecuteJob(id);
+			return true;
+		}
+
+		return false;
 	}
 
 	void JobSystem::ExecuteJob(JobID id)
@@ -146,24 +157,41 @@ namespace rr
 		}
 	}
 
+
 	void JobSystem::RunJob(JobID id)
 	{
 		assert(id != JobID_Null);
-		tls_current_worker_->queue.Push(id);
+		while (!tls_self_->queue.Push(id)) // if queue is full
+		{
+			ProcessOneJob();
+		}
+
+		if (sleeping_workers_.load(std::memory_order_relaxed) > 0)
+		{
+			smph_.release();
+		}
 	}
 
 	void JobSystem::WaitJob(JobID id)
 	{
 		assert(id != JobID_Null);
 		Job* job = GetJobFromID(id);
-		while (job->unfinished_jobs.load(std::memory_order_acquire) > 0)
+
+		while (!IsComplete(job))
 		{
-			JobID const next_job_id = AcquireJob();
-			if (next_job_id != JobID_Null)
-			{
-				ExecuteJob(next_job_id);
-			}
+			ProcessOneJob();
 		}
+	}
+
+	Job* JobSystem::GetJobFromID(JobID id) const noexcept
+	{
+		return job_pool_.GetJob(id);
+	}
+
+	bool JobSystem::IsComplete(Job* job) const noexcept
+	{
+		assert(job);
+		return job->unfinished_jobs.load(std::memory_order_acquire) == 0;
 	}
 
 }

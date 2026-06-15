@@ -9,8 +9,7 @@
 #include <memory>
 #include <utility>
 #include <thread>
-#include <mutex>
-#include <condition_variable>
+#include <semaphore>
 #include <cassert>
 namespace rr
 {
@@ -22,25 +21,24 @@ namespace rr
 			FrameJobCursor frame_job_cursor;
 			size_t worker_id;
 			uint64_t rng_state;
+			std::thread thread;
 		};
 		static_assert(alignof(Worker) == 64);
 
-		inline static thread_local Worker* tls_current_worker_ = nullptr;
+		inline static thread_local Worker* tls_self_ = nullptr;
 
 	public:
+		static constexpr size_t kMaxWorkerThreads{ 16 };
+
 		JobSystem() = default;
 		~JobSystem();
 
 		void WorkerThreadLoop(Worker* self);
 		void Initialize(size_t worker_thread_count);
 		void Shutdown();
-		void KickWorkers() { sleep_cv_.notify_all(); }
 
 		void RunJob(JobID id);
 		void WaitJob(JobID id);
-		JobID AcquireJob();
-		void ExecuteJob(JobID id);
-		void FinishJob(JobID id);
 
 		template<typename T, TypedJobFn<T> Fn, typename ...Args>
 		JobID CreateJobAsChild(JobID parent, Args&&... args);
@@ -50,17 +48,22 @@ namespace rr
 
 
 	private:
-		Job* GetJobFromID(JobID id) const noexcept { return job_pool_.GetJob(id); }
+		bool AcquireJob(JobID& id);
+		bool ProcessOneJob();
+		void ExecuteJob(JobID id);
+		void FinishJob(JobID id);
+
+		Job* GetJobFromID(JobID id) const noexcept;
+		bool IsComplete(Job* job) const noexcept;
 
 	private:
-		std::vector<std::thread> worker_threads_;
 		std::unique_ptr<Worker[]> workers_;
 		size_t worker_count_;
 
 		FrameJobPool job_pool_;
 		std::atomic_bool running_{ false };
-		std::mutex sleep_mutex_;
-		std::condition_variable sleep_cv_;
+		std::atomic_int32_t sleeping_workers_{ 0 };
+		std::counting_semaphore<kMaxWorkerThreads> smph_;
 	};
 
 	template<typename T, TypedJobFn<T> Fn, typename ...Args>
@@ -69,7 +72,7 @@ namespace rr
 		static_assert(sizeof(T) <= 96);
 		static_assert(alignof(T) <= 64);
 
-		JobID id = job_pool_.Allocate(tls_current_worker_->frame_job_cursor);
+		JobID id = job_pool_.Allocate(tls_self_->frame_job_cursor);
 		if (id == JobID_Null)
 		{
 			assert(false && "The job pool is exhausted.");

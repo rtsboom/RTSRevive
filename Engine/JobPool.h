@@ -42,13 +42,13 @@ namespace rr
 		JobID Allocate(FrameJobCursor& cursor)
 		{
 			bool const is_old_chunk = (cursor.chunk_index - frame_chunk_begin_) >= total_chunks_;
-			bool const is_ran_out = cursor.job_offset_in_chunk >= jobs_per_chunk_;
-			if (is_old_chunk || is_ran_out)
+			bool const is_exhausted = cursor.job_offset_in_chunk >= jobs_per_chunk_;
+			if (is_old_chunk || is_exhausted)
 			{
 				uint32_t const chunk_offset = chunk_offset_.fetch_add(1, std::memory_order_relaxed);
 				if (chunk_offset >= total_chunks_)
 				{
-					return std::numeric_limits<JobID>::max();
+					return JobID_Null;
 				}
 
 				cursor.chunk_index = frame_chunk_begin_ + chunk_offset;
