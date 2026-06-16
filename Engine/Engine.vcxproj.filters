@@ -4,7 +4,6 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="EnginePch.cpp" />
     <ClCompile Include="GPUDevice.cpp">
       <Filter>GPU</Filter>
     </ClCompile>
@@ -23,9 +22,12 @@
     <ClCompile Include="JobPool.cpp">
       <Filter>Job</Filter>
     </ClCompile>
+    <ClCompile Include="PCH\pch.cpp" />
+    <ClCompile Include="Test\JobSystemTests.cpp">
+      <Filter>Test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="EnginePch.h" />
     <ClInclude Include="SimpleEvent.h" />
     <ClInclude Include="GPUDevice.h">
       <Filter>GPU</Filter>
@@ -54,6 +56,7 @@
     <ClInclude Include="SPMCQueue.h">
       <Filter>Job</Filter>
     </ClInclude>
+    <ClInclude Include="PCH\pch.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="GPU">
@@ -61,6 +64,9 @@
     </Filter>
     <Filter Include="Job">
       <UniqueIdentifier>{596228e8-ca10-4d73-aabc-a302f9b39b60}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Test">
+      <UniqueIdentifier>{251299a2-b7e4-411a-a0be-02a2a68eef62}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

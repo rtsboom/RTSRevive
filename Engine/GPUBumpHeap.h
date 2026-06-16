@@ -1,5 +1,8 @@
 #pragma once
+#pragma warning(push, 0)
 #include <d3d12.h>
+#pragma warning(pop)
+
 #include <cstdint>
 #include <wrl/client.h>
 namespace rr

@@ -12,7 +12,7 @@ namespace rr
 	struct FrameJobCursor
 	{
 		uint32_t chunk_index = UINT32_MAX;
-		uint32_t job_offset_in_chunk = UINT32_MAX;
+		uint32_t used_jobs = UINT32_MAX;
 	};
 
 	class FrameJobPool
@@ -41,22 +41,22 @@ namespace rr
 
 		JobID Allocate(FrameJobCursor& cursor)
 		{
-			bool const is_old_chunk = (cursor.chunk_index - frame_chunk_begin_) >= total_chunks_;
-			bool const is_exhausted = cursor.job_offset_in_chunk >= jobs_per_chunk_;
-			if (is_old_chunk || is_exhausted)
+			bool const is_old = (cursor.chunk_index - frame_chunk_begin_) >= total_chunks_;
+			bool const is_exhausted = cursor.used_jobs >= jobs_per_chunk_;
+			if (is_old || is_exhausted)
 			{
-				uint32_t const chunk_offset = chunk_offset_.fetch_add(1, std::memory_order_relaxed);
-				if (chunk_offset >= total_chunks_)
+				uint32_t const offset = chunk_offset_.fetch_add(1, std::memory_order_relaxed);
+				if (offset >= total_chunks_)
 				{
 					return JobID_Null;
 				}
 
-				cursor.chunk_index = frame_chunk_begin_ + chunk_offset;
-				cursor.job_offset_in_chunk = 0;
+				cursor.chunk_index = frame_chunk_begin_ + offset;
+				cursor.used_jobs = 0;
 			}
 			uint32_t const job_index =
 				(cursor.chunk_index & total_chunks_mask_) * jobs_per_chunk_
-				+ cursor.job_offset_in_chunk++;
+				+ cursor.used_jobs++;
 
 			return job_index;
 		}

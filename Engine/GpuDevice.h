@@ -1,8 +1,12 @@
 #pragma once
 #include "SimpleEvent.h"
-#include <wrl/client.h>
+
+#pragma warning(push, 0)
 #include <d3d12.h>
 #include <dxgi1_6.h>
+#pragma warning(pop)
+
+#include <wrl/client.h>
 
 namespace rr
 {

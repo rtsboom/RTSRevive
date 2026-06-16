@@ -108,8 +108,8 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>EnginePch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(ProjectDir)PCH;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -126,8 +126,8 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>EnginePch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(ProjectDir)PCH;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -138,19 +138,19 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="EnginePch.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="GPUBumpBuffer.cpp" />
     <ClCompile Include="GPUBumpHeap.cpp" />
     <ClCompile Include="GPUDevice.cpp" />
     <ClCompile Include="GPURegistry.cpp" />
     <ClCompile Include="JobPool.cpp" />
     <ClCompile Include="JobSystem.cpp" />
+    <ClCompile Include="PCH\pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="Test\JobSystemTests.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="EnginePch.h" />
     <ClInclude Include="GPUBumpBuffer.h" />
     <ClInclude Include="GPUBumpHeap.h" />
     <ClInclude Include="GPUDevice.h" />
@@ -158,6 +158,7 @@
     <ClInclude Include="Job.h" />
     <ClInclude Include="JobPool.h" />
     <ClInclude Include="JobSystem.h" />
+    <ClInclude Include="PCH\pch.h" />
     <ClInclude Include="SimpleEvent.h" />
     <ClInclude Include="SPMCQueue.h" />
     <ClInclude Include="WorkStealingQueue.h" />

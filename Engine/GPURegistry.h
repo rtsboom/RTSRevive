@@ -1,6 +1,5 @@
 #pragma once
 #include "GPUBumpBuffer.h"
-#include <d3d12.h>
 #include <wrl/client.h>
 #include <cstdint>
 #include <vector>

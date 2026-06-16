@@ -1,5 +1,4 @@
 #pragma once
-#include <vector>
 #include <atomic>
 #include <cstdint>
 
@@ -19,8 +18,8 @@ namespace rr
 		{
 			WorkStealingQueue<JobID, 1024> queue;
 			FrameJobCursor frame_job_cursor;
-			size_t worker_id;
-			uint64_t rng_state;
+			size_t worker_id{ 0 };
+			uint64_t rng_state{ 0 };
 			std::thread thread;
 		};
 		static_assert(alignof(Worker) == 64);
@@ -28,7 +27,7 @@ namespace rr
 		inline static thread_local Worker* tls_self_ = nullptr;
 
 	public:
-		static constexpr size_t kMaxWorkerThreads{ 16 };
+		static constexpr size_t kMaxWorkerThreads{ 15 };
 
 		JobSystem() = default;
 		~JobSystem();
@@ -46,6 +45,7 @@ namespace rr
 		template<typename T, TypedJobFn<T> Fn, typename ...Args>
 		JobID CreateJob(Args&&... args);
 
+		void SetContinuation(JobID before, JobID after) const noexcept;
 
 	private:
 		bool AcquireJob(JobID& id);
@@ -57,13 +57,13 @@ namespace rr
 		bool IsComplete(Job* job) const noexcept;
 
 	private:
-		std::unique_ptr<Worker[]> workers_;
-		size_t worker_count_;
-
 		FrameJobPool job_pool_;
+		std::unique_ptr<Worker[]> workers_{ nullptr };
+		size_t worker_count_{ 0 };
+
 		std::atomic_bool running_{ false };
 		std::atomic_int32_t sleeping_workers_{ 0 };
-		std::counting_semaphore<kMaxWorkerThreads> smph_;
+		std::counting_semaphore<kMaxWorkerThreads> smph_{ 0 };
 	};
 
 	template<typename T, TypedJobFn<T> Fn, typename ...Args>

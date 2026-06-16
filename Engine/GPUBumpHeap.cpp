@@ -1,9 +1,8 @@
-#include "EnginePch.h"
+#include "pch.h"
 #include "GPUBumpHeap.h"
 #include <MathUtils.h>
 #include <wrl/client.h>
 #include <cstdint>
-#include <stdexcept>
 namespace rr
 {
 	GPUBumpHeap::GPUBumpHeap(ID3D12Device* device, D3D12_HEAP_DESC const& desc)

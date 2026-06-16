@@ -17,7 +17,11 @@
 
 #ifdef _DEBUG
 #define RR_D3D12_DEBUG
+
+#pragma warning(push, 0)
 #include <dxgidebug.h>
+#pragma warning(pop)
+
 #pragma comment(lib, "dxguid.lib")
 #endif
 

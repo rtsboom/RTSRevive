@@ -1,4 +1,4 @@
-#include "EnginePch.h"
+#include "pch.h"
 #include "JobSystem.h"
 #include "Job.h"
 #include <thread>
@@ -61,6 +61,9 @@ namespace rr
 
 	void JobSystem::Initialize(size_t worker_thread_count)
 	{
+		if (kMaxWorkerThreads < worker_thread_count)
+			worker_thread_count = kMaxWorkerThreads;
+
 		worker_count_ = worker_thread_count + 1;
 		workers_ = std::make_unique<Worker[]>(worker_thread_count + 1);
 
@@ -93,6 +96,15 @@ namespace rr
 			if (worker_thread.joinable()) // last one is main worker, blank thread
 				worker_thread.join();
 		}
+	}
+
+	void JobSystem::SetContinuation(JobID before, JobID after) const noexcept
+	{
+		Job* job = GetJobFromID(before);
+		assert(job);
+		assert(job->continuation == JobID_Null); // only one continuation allowed
+		
+		job->continuation = after;
 	}
 
 	bool JobSystem::AcquireJob(JobID& id)
@@ -132,7 +144,7 @@ namespace rr
 	{
 		Job* job = GetJobFromID(id);
 		assert(job);
-		(job->execute_fn)(id, job->data);
+		(job->execute_fn)(*this, id, job->data);
 		FinishJob(id);
 	}
 
@@ -145,14 +157,11 @@ namespace rr
 		if (unfinished == 0)
 		{
 			if (job->parent != JobID_Null)
-			{
 				FinishJob(job->parent);
-			}
 
 			if (job->continuation != JobID_Null)
-			{
 				RunJob(job->continuation);
-			}
+
 			job->destroy_fn(job->data);
 		}
 	}
@@ -167,9 +176,7 @@ namespace rr
 		}
 
 		if (sleeping_workers_.load(std::memory_order_relaxed) > 0)
-		{
 			smph_.release();
-		}
 	}
 
 	void JobSystem::WaitJob(JobID id)

@@ -1,6 +1,10 @@
 #pragma once
 #include "GPUBumpHeap.h"
+
+#pragma warning(push, 0)
 #include <d3d12.h>
+#pragma warning(pop)
+
 #include <wrl/client.h>
 #include <type_traits>
 #include <cstdint>

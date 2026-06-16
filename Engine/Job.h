@@ -6,8 +6,9 @@
 
 namespace rr
 {
+	class JobSystem;
 	using JobID = uint16_t;
-	using JobFn = void(*)(JobID self, void* data);
+	using JobFn = void(*)(JobSystem& sys, JobID self, void* data);
 
 	constexpr JobID JobID_Null = std::numeric_limits<JobID>::max();
 	struct alignas(64) Job
