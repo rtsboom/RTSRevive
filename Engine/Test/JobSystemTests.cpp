@@ -132,22 +132,20 @@ namespace
 		JobSystem js;
 		js.Initialize(4);
 
-		for (int frame = 0; frame < 100; ++frame)
+		constexpr int job_count{ 1000 };
+		constexpr int frame_count{ 100 };
+		for (int frame = 0; frame < frame_count; ++frame)
 		{
-			js.BeginFrame();
-			std::atomic<int> counter = 0;
 
-			constexpr int job_count = 1000;
+			js.FrameReset();
+			std::atomic<int> counter{ 0 };
 
 			JobID root = js.CreateJob<CounterJobData, CounterJob>(&counter);
 			assert(root != JobID_Null);
 
 			for (int i = 0; i < job_count; ++i)
 			{
-				JobID child =
-					js.CreateJobAsChild<CounterJobData, CounterJob>(
-						root,
-						&counter);
+				JobID child = js.CreateJobAsChild<CounterJobData, CounterJob>(root, &counter);
 
 				assert(child != JobID_Null);
 				js.RunJob(child);
@@ -159,6 +157,51 @@ namespace
 			assert(counter.load(std::memory_order_relaxed) == job_count + 1);
 		}
 
+		assert(js.GetTotalExecutedJobs() == (job_count + 1) * frame_count);
+		assert(js.GetTotalPushedJobs() == (job_count + 1) * frame_count);
+		js.Shutdown();
+	}
+
+	void BasicContinuation()
+	{
+		JobSystem js;
+		js.Initialize(4);
+
+		std::atomic<int> counter{ 0 };
+
+		auto a = js.CreateJob<CounterJobData, CounterJob>(&counter);
+		auto b = js.CreateJob<CounterJobData, CounterJob>(&counter);
+
+		js.SetContinuation(a, b);
+
+		js.RunJob(a);
+		js.WaitJob(b);
+
+		assert(counter == 2);
+
+		js.Shutdown();
+	}
+
+	void LongContinuation()
+	{
+		JobSystem js;
+		js.Initialize(4);
+
+		constexpr int continuation_count = 1000;
+		std::atomic<int> counter{ 0 };
+		auto const root = js.CreateJob<CounterJobData, CounterJob>(&counter);
+
+		auto prev = root;
+		for (int i{}; i < continuation_count; ++i)
+		{
+			auto next = js.CreateJob<CounterJobData, CounterJob>(&counter);
+			js.SetContinuation(prev, next);
+			prev = next;
+		}
+
+		js.RunJob(root);
+		js.WaitJob(prev); // last one
+		assert(counter == continuation_count + 1);
 		js.Shutdown();
 	}
 }
@@ -171,5 +214,7 @@ namespace rr::test
 		FanOut();
 		Stress();
 		FrameReset();
+		BasicContinuation();
+		LongContinuation();
 	}
 }

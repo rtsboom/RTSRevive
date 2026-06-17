@@ -77,8 +77,8 @@ namespace rr
 
 		bool Steal(T& out)
 		{
-			uint64_t       t = top_.load(std::memory_order_acquire);
-			uint64_t const b = bottom_.load(std::memory_order_acquire);
+			uint64_t       t = top_.load(std::memory_order_relaxed);
+			uint64_t const b = bottom_.load(std::memory_order_relaxed);
 
 			uint64_t const size = b - t;
 			if (size == 0 || size > capacity_) return false; // empty
@@ -90,7 +90,7 @@ namespace rr
 
 			if (top_.compare_exchange_strong(
 				t, t + 1,
-				std::memory_order_acq_rel,
+				std::memory_order_seq_cst,
 				std::memory_order_relaxed))
 			{
 				out = value;

@@ -50,48 +50,57 @@ namespace rr
 			}
 
 			spin = 0;
-			sleeping_workers_.fetch_add(1, std::memory_order_relaxed);
-			if (!ProcessOneJob() &&
-				running_.load(std::memory_order_acquire))
-				smph_.acquire();
 
-			sleeping_workers_.fetch_sub(1, std::memory_order_relaxed);
+			// pair with WakeOneWorker()
+			sleeping_workers_.fetch_add(1, std::memory_order_seq_cst);
+
+			if (ProcessOneJob() || !running_.load(std::memory_order_acquire))
+			{
+				// cancel sleep, we have work to do or shutting down
+				auto test_old = sleeping_workers_.fetch_sub(1, std::memory_order_relaxed);
+				assert(test_old >= 0);
+				continue;
+			}
+
+			// sleep
+			smph_.acquire();
 		}
 	}
 
-	void JobSystem::Initialize(size_t worker_thread_count)
+	void JobSystem::Initialize(size_t worker_count)
 	{
-		if (kMaxWorkerThreads < worker_thread_count)
-			worker_thread_count = kMaxWorkerThreads;
+		if (worker_count == 0)
+			worker_count = 1;
 
-		worker_count_ = worker_thread_count + 1;
-		workers_ = std::make_unique<Worker[]>(worker_thread_count + 1);
+		if (kMaxWorkerCount < worker_count)
+			worker_count = kMaxWorkerCount;
 
-		tls_self_ = &workers_[worker_thread_count];
-		tls_self_->worker_id = worker_thread_count;
-		tls_self_->rng_state = worker_thread_count + 1;
+		workers_ = std::vector<Worker>(worker_count);
+		tls_self_ = &workers_.front();
 
-		running_.store(true, std::memory_order_release);
 
-		for (size_t i{}; i < worker_thread_count; ++i)
+		for (size_t i{}; i < worker_count; ++i)
 		{
-			workers_[i].worker_id = i;
-			workers_[i].rng_state = i + 1;
-			workers_[i].thread = std::thread(&JobSystem::WorkerThreadLoop, this, &workers_[i]);
+			workers_[i].id = i;
+			workers_[i].rng_state = i + 1; // rng state cannot be 0
 		}
 
+		running_.store(true, std::memory_order_release);
+		for (size_t i{ 1 }; i < worker_count; ++i)
+		{
+			workers_[i].thread = std::thread(&JobSystem::WorkerThreadLoop, this, &workers_[i]);
+		}
 	}
 
 	void JobSystem::Shutdown()
 	{
 		running_.store(false, std::memory_order_release);
-		smph_.release(worker_count_ - 1);
+		smph_.release(GetBackgroundWorkerCount());
 
-		for (size_t i{}; i < worker_count_; ++i)
+		for (auto& worker : workers_)
 		{
-			auto& worker_thread = workers_[i].thread;
-			if (worker_thread.joinable()) // last one is main worker, blank thread
-				worker_thread.join();
+			if (worker.thread.joinable())
+				worker.thread.join();
 		}
 	}
 
@@ -104,20 +113,66 @@ namespace rr
 		job->continuation = after;
 	}
 
-	bool JobSystem::AcquireJob(JobID& id)
+	uint64_t JobSystem::GetTotalExecutedJobs() const noexcept
 	{
-		if (tls_self_->queue.Pop(id))
+		uint64_t total = 0;
+		for (auto const& worker : workers_)
+		{
+			total += worker.executed_jobs;
+		}
+		return total;
+	}
+
+	uint64_t JobSystem::GetTotalPushedJobs() const noexcept
+	{
+		uint64_t total = 0;
+		for (auto const& worker : workers_)
+		{
+			total += worker.pushed_jobs;
+		}
+		return total;
+	}
+
+	uint64_t JobSystem::GetCurrentExecutedJobs() const noexcept
+	{
+		uint64_t total = GetTotalExecutedJobs();
+		uint64_t const current_total = total - prev_total_executed_jobs_;
+		return current_total;
+	}
+
+	uint64_t JobSystem::GetCurrentPushedJobs() const noexcept
+	{
+		uint64_t total = GetTotalPushedJobs();
+		uint64_t const current_total = total - prev_total_pushed_jobs_;
+		return current_total;
+	}
+
+	bool JobSystem::PushJob(JobID id)
+	{
+		if (tls_self_->queue.Push(id))
+		{
+			++tls_self_->pushed_jobs;
+			return true;
+		}
+
+		return false;
+	}
+
+	bool JobSystem::AcquireJob(JobID& out)
+	{
+		if (tls_self_->queue.Pop(out))
 			return true;
 
 		uint64_t const random = XorShift64(tls_self_->rng_state);
 
-		for (size_t i{}; i < worker_count_; ++i)
+		size_t const n = GetTotalWorkerCount();
+		for (size_t i{}; i < n; ++i)
 		{
-			size_t const victim = (random + i) % worker_count_;
-			if (victim == tls_self_->worker_id)
+			size_t const victim = (random + i) % n;
+			if (victim == tls_self_->id)
 				continue;
 
-			if (workers_[victim].queue.Steal(id))
+			if (workers_[victim].queue.Steal(out))
 				return true;
 		}
 
@@ -127,7 +182,6 @@ namespace rr
 	bool JobSystem::ProcessOneJob()
 	{
 		JobID id;
-
 		if (AcquireJob(id))
 		{
 			ExecuteJob(id);
@@ -143,6 +197,9 @@ namespace rr
 		assert(job);
 		(job->execute_fn)(*this, id, job->data);
 		FinishJob(id);
+
+		// for stats
+		++tls_self_->executed_jobs;
 	}
 
 	void JobSystem::FinishJob(JobID id)
@@ -167,13 +224,12 @@ namespace rr
 	void JobSystem::RunJob(JobID id)
 	{
 		assert(id != JobID_Null);
-		while (!tls_self_->queue.Push(id)) // if queue is full
+		while (!PushJob(id)) // if queue is full
 		{
 			ProcessOneJob();
 		}
 
-		if (sleeping_workers_.load(std::memory_order_relaxed) > 0)
-			WakeOneWorker();
+		WakeOneWorker();
 	}
 
 	void JobSystem::WaitJob(JobID id)
@@ -187,10 +243,12 @@ namespace rr
 		}
 	}
 
-    void JobSystem::BeginFrame()
-    {
+	void JobSystem::FrameReset()
+	{
 		job_pool_.Reset();
-    }
+		prev_total_executed_jobs_ = GetTotalExecutedJobs();
+		prev_total_pushed_jobs_ = GetTotalPushedJobs();
+	}
 
 	JobID JobSystem::AllocateJob()
 	{
@@ -214,14 +272,16 @@ namespace rr
 
 	void JobSystem::WakeOneWorker()
 	{
-		int32_t n = sleeping_workers_.load(std::memory_order_acquire);
+		// Prevent Store-Load reordering (PushJob -> Load) 
+		std::atomic_thread_fence(std::memory_order_seq_cst);
+		int32_t n = sleeping_workers_.load(std::memory_order_relaxed);
 
 		while (n > 0)
 		{
 			if (sleeping_workers_.compare_exchange_weak(
 				n,
 				n - 1,
-				std::memory_order_acq_rel,
+				std::memory_order_relaxed,
 				std::memory_order_relaxed))
 			{
 				smph_.release();
