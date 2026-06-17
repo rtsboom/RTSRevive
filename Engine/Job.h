@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <cstddef>
 #include <limits>
+#include <memory>
+#include <utility>
 
 namespace rr
 {
@@ -28,11 +30,26 @@ namespace rr
 
 
 	template<typename T>
-	using TypedJobFn = void(*)(JobID self, T& data);
+	using TypedJobFn = void(*)(JobSystem& sys, JobID self, T& data);
 
 	template<typename T, TypedJobFn<T> Fn>
-	void JobTrampoline(JobID self, void* data)
+	void JobTrampoline(JobSystem& sys, JobID self, void* data)
 	{
-		Fn(self, *static_cast<T*>(data));
+		Fn(sys, self, *static_cast<T*>(data));
+	}
+
+	template<typename T, TypedJobFn<T> Fn, typename ...Args>
+	void SetJobPayload(Job* job, Args&& ...args)
+	{
+		static_assert(sizeof(T) <= Job::kDataSize);
+		static_assert(alignof(T) <= alignof(Job));
+		job->execute_fn = &JobTrampoline<T, Fn>;
+		job->destroy_fn =
+			[](void* data)
+			{
+				std::destroy_at(static_cast<T*>(data));
+			};
+
+		::new (job->data) T(std::forward<Args>(args)...);
 	}
 }

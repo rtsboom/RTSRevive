@@ -38,6 +38,7 @@ namespace rr
 
 		void RunJob(JobID id);
 		void WaitJob(JobID id);
+		void BeginFrame();
 
 		template<typename T, TypedJobFn<T> Fn, typename ...Args>
 		JobID CreateJobAsChild(JobID parent, Args&&... args);
@@ -53,8 +54,11 @@ namespace rr
 		void ExecuteJob(JobID id);
 		void FinishJob(JobID id);
 
+		JobID AllocateJob();
 		Job* GetJobFromID(JobID id) const noexcept;
 		bool IsComplete(Job* job) const noexcept;
+
+		void WakeOneWorker();
 
 	private:
 		FrameJobPool job_pool_;
@@ -63,42 +67,38 @@ namespace rr
 
 		std::atomic_bool running_{ false };
 		std::atomic_int32_t sleeping_workers_{ 0 };
-		std::counting_semaphore<kMaxWorkerThreads> smph_{ 0 };
+		std::counting_semaphore<kMaxWorkerThreads * 2> smph_{ 0 };
 	};
 
 	template<typename T, TypedJobFn<T> Fn, typename ...Args>
-	inline JobID JobSystem::CreateJobAsChild(JobID parent, Args && ...args)
+	inline JobID JobSystem::CreateJobAsChild(JobID parent, Args&& ...args)
 	{
-		static_assert(sizeof(T) <= 96);
-		static_assert(alignof(T) <= 64);
+		JobID current = AllocateJob();
+		Job* current_job = GetJobFromID(current);
+		Job* parent_job = GetJobFromID(parent);
+		parent_job->unfinished_jobs.fetch_add(1, std::memory_order_relaxed);
 
-		JobID id = job_pool_.Allocate(tls_self_->frame_job_cursor);
-		if (id == JobID_Null)
-		{
-			assert(false && "The job pool is exhausted.");
-			return JobID_Null;
-		}
+		current_job->parent = parent;
+		current_job->continuation = JobID_Null;
+		SetJobPayload<T, Fn>(current_job, std::forward<Args>(args)...);
 
-		Job* job = job_pool_.GetJob(id);
-		*job = {}; // reset job 
+		current_job->unfinished_jobs.store(1, std::memory_order_relaxed);
 
-		job->parent = parent;
-		job->execute_fn = &JobTrampoline<T, Fn>;
-		job->destroy_fn =
-			[](void* data)
-			{
-				std::destroy_at(static_cast<T*>(data));
-			};
-
-		::new (job->data) T(std::forward<Args>(args)...);
-
-		job->unfinished_jobs.store(1, std::memory_order_relaxed);
-		return id;
+		return current;
 	}
 
 	template<typename T, TypedJobFn<T> Fn, typename ...Args>
 	inline JobID JobSystem::CreateJob(Args&& ...args)
 	{
-		return CreateJbAsChild<T, Fn>(JobID_Null, std::forward<Args>(args)...);
+		JobID current = AllocateJob();
+		Job* current_job = GetJobFromID(current);
+
+		current_job->parent = JobID_Null;
+		current_job->continuation = JobID_Null;
+		SetJobPayload<T, Fn>(current_job, std::forward<Args>(args)...);
+
+		current_job->unfinished_jobs.store(1, std::memory_order_relaxed);
+
+		return current;
 	}
 }

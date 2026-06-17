@@ -85,10 +85,7 @@ namespace rr
 	void JobSystem::Shutdown()
 	{
 		running_.store(false, std::memory_order_release);
-
-		int32_t const sleepers = sleeping_workers_.load(std::memory_order_relaxed);
-		for (size_t i{}; i < sleepers; ++i)
-			smph_.release();
+		smph_.release(worker_count_ - 1);
 
 		for (size_t i{}; i < worker_count_; ++i)
 		{
@@ -103,7 +100,7 @@ namespace rr
 		Job* job = GetJobFromID(before);
 		assert(job);
 		assert(job->continuation == JobID_Null); // only one continuation allowed
-		
+
 		job->continuation = after;
 	}
 
@@ -176,7 +173,7 @@ namespace rr
 		}
 
 		if (sleeping_workers_.load(std::memory_order_relaxed) > 0)
-			smph_.release();
+			WakeOneWorker();
 	}
 
 	void JobSystem::WaitJob(JobID id)
@@ -190,8 +187,22 @@ namespace rr
 		}
 	}
 
+    void JobSystem::BeginFrame()
+    {
+		job_pool_.Reset();
+    }
+
+	JobID JobSystem::AllocateJob()
+	{
+		JobID id = job_pool_.Allocate(tls_self_->frame_job_cursor);
+		assert(id != JobID_Null && "The job pool is exhausted.");
+
+		return id;
+	}
+
 	Job* JobSystem::GetJobFromID(JobID id) const noexcept
 	{
+		assert(id != JobID_Null);
 		return job_pool_.GetJob(id);
 	}
 
@@ -199,6 +210,24 @@ namespace rr
 	{
 		assert(job);
 		return job->unfinished_jobs.load(std::memory_order_acquire) == 0;
+	}
+
+	void JobSystem::WakeOneWorker()
+	{
+		int32_t n = sleeping_workers_.load(std::memory_order_acquire);
+
+		while (n > 0)
+		{
+			if (sleeping_workers_.compare_exchange_weak(
+				n,
+				n - 1,
+				std::memory_order_acq_rel,
+				std::memory_order_relaxed))
+			{
+				smph_.release();
+				return;
+			}
+		}
 	}
 
 }
