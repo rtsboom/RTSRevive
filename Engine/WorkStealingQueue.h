@@ -1,8 +1,8 @@
 #pragma once
 #include <type_traits>
 #include <atomic>
-#include <memory>
 #include <cstdint>
+#include <vector>
 
 namespace rr
 {
@@ -18,7 +18,7 @@ namespace rr
 			: top_{ 0 }
 			, bottom_{ 0 }
 		{
-			buffer_ = std::make_unique<T[]>(capacity_);
+			buffer_ = std::vector<T>(capacity_);
 		}
 
 		bool Push(T value)
@@ -103,7 +103,7 @@ namespace rr
 	private:
 		alignas(64) std::atomic_uint64_t top_; // steal side
 		alignas(64) std::atomic_uint64_t bottom_; // owner side
-		alignas(64) std::unique_ptr<T[]> buffer_;
+		alignas(64) std::vector<T> buffer_;
 	};
 }
 

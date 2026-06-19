@@ -20,19 +20,22 @@ namespace rr
 			size_t id{ 0 };
 			uint64_t rng_state{ 0 };
 
-			//for stat
+			//for stats
 			uint64_t executed_jobs{ 0 };
 			uint64_t pushed_jobs{ 0 };
 
 			// background thread, not used in main worker
 			std::thread thread;
+			std::binary_semaphore wake_smph{ 0 };
 		};
 		static_assert(alignof(Worker) == 64);
 
 		inline static thread_local Worker* tls_self_ = nullptr;
 
 	public:
-		static constexpr size_t kMaxWorkerCount{ 32 };
+		// Uses a 64-bit sleeping worker bitmask.
+		// Therefore, the worker count must not exceed 64.
+		static constexpr size_t kMaxWorkerCount{ 64 };
 
 		JobSystem() = default;
 		~JobSystem();
@@ -79,8 +82,7 @@ namespace rr
 		std::vector<Worker> workers_;
 
 		std::atomic_bool running_{ false };
-		std::atomic_int32_t sleeping_workers_{ 0 };
-		std::counting_semaphore<kMaxWorkerCount * 2> smph_{ 0 };
+		std::atomic_uint64_t sleeping_worker_mask_{ 0 };
 
 		// for stats
 		uint64_t prev_total_pushed_jobs_{ 0 };

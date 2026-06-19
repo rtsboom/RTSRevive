@@ -6,6 +6,9 @@
 #include <cassert>
 #include <memory>
 #include <Windows.h>
+#include <atomic>
+#include <bit>
+#include <vector>
 
 static uint64_t XorShift64(uint64_t& state)
 {
@@ -31,39 +34,24 @@ namespace rr
 	void JobSystem::WorkerThreadLoop(Worker* worker)
 	{
 		tls_self_ = worker;
+		uint64_t const current_worker_mask = 1ull << worker->id;
 
-		constexpr uint32_t spin_threshold{ 64 };
-		uint32_t spin{ 0 };
 		while (running_.load(std::memory_order_acquire))
 		{
 			if (ProcessOneJob())
-			{
-				spin = 0;
 				continue;
-			}
-
-			++spin;
-			if (spin < spin_threshold)
-			{
-				_mm_pause();
-				continue;
-			}
-
-			spin = 0;
 
 			// pair with WakeOneWorker()
-			sleeping_workers_.fetch_add(1, std::memory_order_seq_cst);
+			sleeping_worker_mask_.fetch_or(current_worker_mask, std::memory_order_seq_cst);
 
 			if (ProcessOneJob() || !running_.load(std::memory_order_acquire))
 			{
-				// cancel sleep, we have work to do or shutting down
-				auto test_old = sleeping_workers_.fetch_sub(1, std::memory_order_relaxed);
-				assert(test_old >= 0);
+				sleeping_worker_mask_.fetch_and(~current_worker_mask, std::memory_order_relaxed);
 				continue;
 			}
 
 			// sleep
-			smph_.acquire();
+			worker->wake_smph.acquire();
 		}
 	}
 
@@ -76,7 +64,7 @@ namespace rr
 			worker_count = kMaxWorkerCount;
 
 		workers_ = std::vector<Worker>(worker_count);
-		tls_self_ = &workers_.front();
+		tls_self_ = &workers_.back();
 
 
 		for (size_t i{}; i < worker_count; ++i)
@@ -86,7 +74,7 @@ namespace rr
 		}
 
 		running_.store(true, std::memory_order_release);
-		for (size_t i{ 1 }; i < worker_count; ++i)
+		for (size_t i{}; i < GetBackgroundWorkerCount(); ++i)
 		{
 			workers_[i].thread = std::thread(&JobSystem::WorkerThreadLoop, this, &workers_[i]);
 		}
@@ -95,7 +83,14 @@ namespace rr
 	void JobSystem::Shutdown()
 	{
 		running_.store(false, std::memory_order_release);
-		smph_.release(GetBackgroundWorkerCount());
+
+		uint64_t mask = sleeping_worker_mask_.exchange(0ull, std::memory_order_acq_rel);
+
+
+		for (size_t i{}; i < GetBackgroundWorkerCount(); ++i)
+		{
+			workers_[i].wake_smph.release();
+		}
 
 		for (auto& worker : workers_)
 		{
@@ -274,17 +269,20 @@ namespace rr
 	{
 		// Prevent Store-Load reordering (PushJob -> Load) 
 		std::atomic_thread_fence(std::memory_order_seq_cst);
-		int32_t n = sleeping_workers_.load(std::memory_order_relaxed);
+		uint64_t mask = sleeping_worker_mask_.load(std::memory_order_relaxed);
 
-		while (n > 0)
+		while (mask != 0)
 		{
-			if (sleeping_workers_.compare_exchange_weak(
-				n,
-				n - 1,
+			int const i = std::countr_zero(mask);
+			uint64_t const target_mask = 1ull << i;
+
+			if (sleeping_worker_mask_.compare_exchange_weak(
+				mask,
+				mask & ~target_mask,
 				std::memory_order_relaxed,
 				std::memory_order_relaxed))
 			{
-				smph_.release();
+				workers_[i].wake_smph.release();
 				return;
 			}
 		}
