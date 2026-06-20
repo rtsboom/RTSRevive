@@ -15,7 +15,9 @@ int WINAPI WinMain(
 	_In_ int nCmdShow)
 {
 	rr::test::RunJobSystemTests();
-	//return RunGame(hInstance, nCmdShow);
+	return RunGame(hInstance, nCmdShow);
+
+	return 0;
 }
 
 

@@ -130,10 +130,10 @@ namespace
 	void FrameReset()
 	{
 		JobSystem js;
-		js.Initialize(4);
+		js.Initialize(8);
 
 		constexpr int job_count{ 1000 };
-		constexpr int frame_count{ 100 };
+		constexpr int frame_count{ 1000 };
 		for (int frame = 0; frame < frame_count; ++frame)
 		{
 
