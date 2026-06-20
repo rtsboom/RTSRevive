@@ -26,6 +26,9 @@
     <ClCompile Include="Test\JobSystemTests.cpp">
       <Filter>Test</Filter>
     </ClCompile>
+    <ClCompile Include="GLTFUtils.cpp">
+      <Filter>GLTF</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SimpleEvent.h" />
@@ -67,6 +70,9 @@
     </Filter>
     <Filter Include="Test">
       <UniqueIdentifier>{251299a2-b7e4-411a-a0be-02a2a68eef62}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GLTF">
+      <UniqueIdentifier>{13754d6f-35be-4c04-aa07-adec179a03bd}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

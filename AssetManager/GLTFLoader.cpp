@@ -775,14 +775,15 @@ namespace rr
 
 	std::unique_ptr<AssetBase> ImportGLTF(std::string const& filename)
 	{
-		tg3_error_stack errors;
-		tg3_error_stack_init(&errors);
-	
 		tg3_parse_options opts;
+		tg3_error_stack errors;
+		tg3_model model;
+	
 		tg3_parse_options_init(&opts);
+		tg3_error_stack_init(&errors);
+
 		opts.images_as_is = 1; // Don't decode images
 
-		tg3_model model;
 		tg3_error_code err = tg3_parse_file(&model, &errors, filename.data(), u32(filename.size()), &opts);
 
 		GltfImporter importer{ &model };

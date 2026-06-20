@@ -6,21 +6,11 @@
   <ItemGroup>
     <ClInclude Include="pch.h" />
     <ClInclude Include="GLTFLoader.h" />
-    <ClInclude Include="StagingModel.h" />
-    <ClInclude Include="Texture.h" />
     <ClInclude Include="ModelAsset.h" />
-    <ClInclude Include="TextureRegistry.h" />
-    <ClInclude Include="GeometryRegistry.h" />
-    <ClInclude Include="ModelRegistry.h" />
-    <ClInclude Include="AssetLoader.h" />
     <ClInclude Include="AssetBase.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="GLTFLoader.cpp" />
-    <ClCompile Include="TextureRegistry.cpp" />
-    <ClCompile Include="GeometryRegistry.cpp" />
-    <ClCompile Include="ModelRegistry.cpp" />
-    <ClCompile Include="AssetLoader.cpp" />
   </ItemGroup>
 </Project>

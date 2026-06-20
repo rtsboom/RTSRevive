@@ -110,6 +110,8 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>$(SolutionDir);$(ProjectDir)PCH;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <DisableAnalyzeExternal>true</DisableAnalyzeExternal>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -128,6 +130,8 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>$(SolutionDir);$(ProjectDir)PCH;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <DisableAnalyzeExternal>true</DisableAnalyzeExternal>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -138,6 +142,7 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="GLTFUtils.cpp" />
     <ClCompile Include="GPUBumpBuffer.cpp" />
     <ClCompile Include="GPUBumpHeap.cpp" />
     <ClCompile Include="GPUDevice.cpp" />
@@ -162,6 +167,11 @@
     <ClInclude Include="SimpleEvent.h" />
     <ClInclude Include="SPMCQueue.h" />
     <ClInclude Include="WorkStealingQueue.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TinyGLTFv3\TinyGLTFv3.vcxproj">
+      <Project>{daa79194-0ddf-4092-bc7c-6fada79e515c}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
