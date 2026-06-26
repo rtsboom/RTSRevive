@@ -29,6 +29,7 @@
     <ClCompile Include="GLTFUtils.cpp">
       <Filter>GLTF</Filter>
     </ClCompile>
+    <ClCompile Include="VirtualMemory.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SimpleEvent.h" />
@@ -60,6 +61,8 @@
       <Filter>Job</Filter>
     </ClInclude>
     <ClInclude Include="PCH\pch.h" />
+    <ClInclude Include="DynamicArray.h" />
+    <ClInclude Include="VirtualMemory.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="GPU">

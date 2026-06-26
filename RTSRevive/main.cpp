@@ -9,14 +9,12 @@ namespace rr::test
 	void RunJobSystemTests();
 }
 
+
+
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int nCmdShow)
 {
-	rr::test::RunJobSystemTests();
-
-
-
-
-
+	using namespace rr;
+	//rr::test::RunJobSystemTests();
 
 
 	//return RunGame(hInstance, nCmdShow);
