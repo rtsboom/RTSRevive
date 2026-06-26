@@ -14,46 +14,38 @@ namespace rr
 {
 	struct Model
 	{
-		uint32_t geometry_base_offset; // in bytes
-		uint32_t geometry_total_bytes;
+		struct IdxSpan { uint16_t start, count; };
+		struct ByteSpan { uint32_t offset_bytes, size_bytes; };
 
-		uint32_t material_base_index;
-		uint32_t material_count;
-		uint32_t primitive_base_index;
-		uint32_t primitive_count;
-		uint32_t mesh_base_index;
-		uint32_t mesh_count;
-		uint32_t node_base_index;
-		uint32_t node_count;
+		ByteSpan geometries;
+		IdxSpan materials;
+		IdxSpan primitives;
+		IdxSpan meshes;
+		IdxSpan nodes;
+		IdxSpan animclips;
 
-		uint32_t skeleton_index;
-		uint32_t animation_clip_base_index;
-		uint32_t animation_clip_count;
+		uint16_t skeleton;
 	};
 
 	struct MeshPrimitive
 	{
-		uint32_t index_offset; // in bytes
+		struct ByteSpan { uint32_t offset_bytes, size_bytes; };
+		ByteSpan indices;
 		uint32_t index_stride;
-		uint32_t index_count;
 
 		// position stride is always 12B (float3)
-		uint32_t position_offset; // in bytes
-		uint32_t position_count;
+		ByteSpan positions;
 
 		// normal stride is always 4B (R8G8B8A8_SNORM)
-		uint32_t normal_offset; // in bytes
-		uint32_t normal_count;
+		ByteSpan normals;
 
 		// UV stride is always 4B (half2)
-		uint32_t uv0_offset; // in bytes
-		uint32_t uv0_count;
+		ByteSpan uv0s;
 
 		// tangent stride is always 4B (R8G8B8A8_SNORM)
-		uint32_t tangent_offset; // in bytes
-		uint32_t tangent_count;
+		ByteSpan tangents;
 
-		uint32_t material_index;
+		uint32_t material;
 	};
 
 }
