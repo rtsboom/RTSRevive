@@ -29,7 +29,12 @@
     <ClCompile Include="GLTFUtils.cpp">
       <Filter>GLTF</Filter>
     </ClCompile>
-    <ClCompile Include="VirtualMemory.cpp" />
+    <ClCompile Include="VirtualArena.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="VirtualMemory.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SimpleEvent.h" />
@@ -61,8 +66,15 @@
       <Filter>Job</Filter>
     </ClInclude>
     <ClInclude Include="PCH\pch.h" />
-    <ClInclude Include="DynamicArray.h" />
-    <ClInclude Include="VirtualMemory.h" />
+    <ClInclude Include="VirtualArena.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="VirtualMemory.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="DynamicArray.h">
+      <Filter>Core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="GPU">
@@ -76,6 +88,9 @@
     </Filter>
     <Filter Include="GLTF">
       <UniqueIdentifier>{13754d6f-35be-4c04-aa07-adec179a03bd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core">
+      <UniqueIdentifier>{6b9832df-0f08-4928-bd05-030d792ede32}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

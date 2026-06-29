@@ -154,6 +154,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Test\JobSystemTests.cpp" />
+    <ClCompile Include="VirtualArena.cpp" />
     <ClCompile Include="VirtualMemory.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -168,6 +169,7 @@
     <ClInclude Include="PCH\pch.h" />
     <ClInclude Include="SimpleEvent.h" />
     <ClInclude Include="SPMCQueue.h" />
+    <ClInclude Include="VirtualArena.h" />
     <ClInclude Include="VirtualMemory.h" />
     <ClInclude Include="WorkStealingQueue.h" />
   </ItemGroup>

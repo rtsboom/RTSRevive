@@ -2,7 +2,6 @@
 #include "VirtualMemory.h"
 #include <Windows.h>
 #include <cassert>
-#include <cstdlib>
 #include <stdexcept>
 #include <string>
 
@@ -27,6 +26,11 @@ namespace rr
 	{
 		return GetSystemInfoCached().dwPageSize;
 	}
+
+    size_t VirtualMemory::GetAllocationGranularity()
+    {
+		return GetSystemInfoCached().dwAllocationGranularity;
+    }
 
 	void* VirtualMemory::Reserve(size_t size)
 	{

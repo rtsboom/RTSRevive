@@ -1,6 +1,7 @@
 #include "pch.h"
 #include <TinyGLTFv3/tiny_gltf_v3.h>
 #include <cstdint>
+#include <cstddef>
 
 namespace
 {
@@ -12,19 +13,31 @@ namespace
 
 namespace rr
 {
+	struct Material;
+	struct MeshPrimitive;
+	struct Mesh;
+	struct SceneNode;
+	struct AnimationClip;
+	struct Skeleton;
+
 	struct Model
 	{
-		struct IdxSpan { uint16_t start, count; };
-		struct ByteSpan { uint32_t offset_bytes, size_bytes; };
+		std::byte* geometry_buffer;
+		Material* materials;
+		MeshPrimitive* primitives;
+		Mesh* meshes;
+		SceneNode* nodes;
 
-		ByteSpan geometries;
-		IdxSpan materials;
-		IdxSpan primitives;
-		IdxSpan meshes;
-		IdxSpan nodes;
-		IdxSpan animclips;
+		uint32_t geometry_buffer_size_bytes;
+		uint32_t material_count;
+		uint32_t primitive_count;
+		uint32_t mesh_count;
+		uint32_t node_count;
 
-		uint16_t skeleton;
+		AnimationClip* animclips;
+		uint32_t animclip_count;
+
+		uint32_t skeleton;
 	};
 
 	struct MeshPrimitive
