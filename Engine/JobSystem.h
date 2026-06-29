@@ -9,6 +9,9 @@
 #include <thread>
 #include <semaphore>
 #include <vector>
+#include <tuple>
+#include <memory>
+#include <type_traits>
 namespace rr
 {
 	class JobSystem
@@ -48,11 +51,17 @@ namespace rr
 		void WaitJob(JobID id);
 		void FrameReset();
 
-		template<typename T, TypedJobFn<T> Fn, typename ...Args>
-		JobID CreateJobAsChild(JobID parent, Args&&... args);
+		template<auto Fn, typename ...Args>
+		JobID CreateJob(Args&& ...args);
 
-		template<typename T, TypedJobFn<T> Fn, typename ...Args>
-		JobID CreateJob(Args&&... args);
+		template<auto Fn, typename ...Args>
+		JobID CreateJobAsChild(JobID parent, Args&& ...args);
+
+		//template<typename T, TypedJobFn<T> Fn, typename ...Args>
+		//JobID CreateJobAsChild(JobID parent, Args&&... args);
+
+		//template<typename T, TypedJobFn<T> Fn, typename ...Args>
+		//JobID CreateJob(Args&&... args);
 
 		void SetContinuation(JobID before, JobID after) const noexcept;
 
@@ -91,35 +100,82 @@ namespace rr
 
 
 
-	template<typename T, TypedJobFn<T> Fn, typename ...Args>
-	inline JobID JobSystem::CreateJobAsChild(JobID parent, Args&& ...args)
-	{
-		JobID current = AllocateJob();
-		Job* current_job = GetJobFromID(current);
-		Job* parent_job = GetJobFromID(parent);
-		parent_job->unfinished_jobs.fetch_add(1, std::memory_order_relaxed);
-
-		current_job->parent = parent;
-		current_job->continuation = JobID_Null;
-		SetJobPayload<T, Fn>(current_job, std::forward<Args>(args)...);
-
-		current_job->unfinished_jobs.store(1, std::memory_order_relaxed);
-
-		return current;
-	}
-
-	template<typename T, TypedJobFn<T> Fn, typename ...Args>
+	template<auto Fn, typename ...Args>
 	inline JobID JobSystem::CreateJob(Args&& ...args)
 	{
+		using Payload = std::tuple<std::decay_t<Args>...>;
+		static_assert(sizeof(Payload) <= Job::kDataSize);
+
 		JobID current = AllocateJob();
 		Job* current_job = GetJobFromID(current);
-
 		current_job->parent = JobID_Null;
 		current_job->continuation = JobID_Null;
-		SetJobPayload<T, Fn>(current_job, std::forward<Args>(args)...);
+
+		new (current_job->data) Payload(std::forward<Args>(args)...);
+
+		current_job->execute_fn = [](JobSystem& sys, JobID self, void* data)
+			{
+				auto& payload = *static_cast<Payload*>(data);
+				auto receiver = [&](auto& ...xs)
+					{
+						Fn(sys, self, xs...);
+					};
+
+				std::apply(receiver, payload);
+			};
+
+		current_job->destroy_fn = [](void* data)
+			{
+				std::destroy_at(static_cast<Payload*>(data));
+			};
 
 		current_job->unfinished_jobs.store(1, std::memory_order_relaxed);
+		return current;
+
+	}
+
+	template<auto Fn, typename ...Args>
+	inline JobID JobSystem::CreateJobAsChild(JobID parent, Args&& ...args)
+	{
+		JobID current = CreateJob<Fn>(std::forward<Args>(args)...);
+		Job* current_job = GetJobFromID(current);
+		Job* parent_job = GetJobFromID(parent);
+		current_job->parent = parent;
+		parent_job->unfinished_jobs.fetch_add(1, std::memory_order_relaxed);
 
 		return current;
 	}
+
+	//template<typename T, TypedJobFn<T> Fn, typename ...Args>
+	//inline JobID JobSystem::CreateJobAsChild(JobID parent, Args&& ...args)
+	//{
+	//	JobID current = AllocateJob();
+	//	Job* current_job = GetJobFromID(current);
+	//	Job* parent_job = GetJobFromID(parent);
+	//	parent_job->unfinished_jobs.fetch_add(1, std::memory_order_relaxed);
+
+	//	current_job->parent = parent;
+	//	current_job->continuation = JobID_Null;
+	//	SetJobPayload<T, Fn>(current_job, std::forward<Args>(args)...);
+
+	//	current_job->unfinished_jobs.store(1, std::memory_order_relaxed);
+
+	//	return current;
+	//}
+
+	//template<typename T, TypedJobFn<T> Fn, typename ...Args>
+	//inline JobID JobSystem::CreateJob(Args&& ...args)
+	//{
+	//	JobID current = AllocateJob();
+	//	Job* current_job = GetJobFromID(current);
+
+	//	current_job->parent = JobID_Null;
+	//	current_job->continuation = JobID_Null;
+	//	SetJobPayload<T, Fn>(current_job, std::forward<Args>(args)...);
+
+	//	current_job->unfinished_jobs.store(1, std::memory_order_relaxed);
+
+	//	return current;
+	//}
+
 }

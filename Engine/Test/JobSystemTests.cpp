@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Engine/JobSystem.h"
+#include <cassert>
 
 namespace
 {
@@ -26,8 +27,11 @@ namespace
 		if (data.depth <= 0)
 			return;
 
-		JobID a = sys.CreateJobAsChild<FanOutJobData, FanOutJob>(self, data.counter, data.depth - 1);
-		JobID b = sys.CreateJobAsChild<FanOutJobData, FanOutJob>(self, data.counter, data.depth - 1);
+		//JobID a = sys.CreateJobAsChild<FanOutJobData, FanOutJob>(self, data.counter, data.depth - 1);
+		//JobID b = sys.CreateJobAsChild<FanOutJobData, FanOutJob>(self, data.counter, data.depth - 1);
+		JobID a = sys.CreateJobAsChild<FanOutJob>(self, FanOutJobData{ data.counter, data.depth - 1 });
+		JobID b = sys.CreateJobAsChild<FanOutJob>(self, FanOutJobData{ data.counter, data.depth - 1 });
+
 		assert(a != JobID_Null);
 		assert(b != JobID_Null);
 
@@ -40,7 +44,8 @@ namespace
 		JobSystem js;
 		js.Initialize(4);
 		std::atomic_int32_t counter{ 0 };
-		JobID job = js.CreateJob<CounterJobData, CounterJob>(&counter);
+		JobID job = js.CreateJob<CounterJob>(CounterJobData{ &counter });
+
 		assert(job != JobID_Null);
 
 		js.RunJob(job);
@@ -58,12 +63,12 @@ namespace
 		constexpr int job_count = 10'000;
 		std::atomic<int> counter = 0;
 
-		JobID root = js.CreateJob<CounterJobData, CounterJob>(&counter);
+		JobID root = js.CreateJob<CounterJob>(CounterJobData{ &counter });
 		assert(root != JobID_Null);
 
 		for (int i = 0; i < job_count; ++i)
 		{
-			JobID child = js.CreateJobAsChild<CounterJobData, CounterJob>(root, &counter);
+			JobID child = js.CreateJobAsChild<CounterJob>(root, CounterJobData{ &counter });
 			assert(child != JobID_Null);
 			js.RunJob(child);
 		}
@@ -87,7 +92,7 @@ namespace
 		constexpr int depth = 10;
 		constexpr int expected = (1 << (depth + 1)) - 1;
 
-		JobID root = js.CreateJob<FanOutJobData, FanOutJob>(&counter, depth);
+		JobID root = js.CreateJob<FanOutJob>(FanOutJobData{ &counter, depth });
 		assert(root != JobID_Null);
 
 		js.RunJob(root);
@@ -108,12 +113,15 @@ namespace
 			constexpr int job_count = 30'000; // Max 2^15
 			std::atomic<int> counter = 0;
 
-			JobID root = js.CreateJob<CounterJobData, CounterJob>(&counter);
+			JobID root = js.CreateJob<CounterJob>(CounterJobData{ &counter });
+
+
 			assert(root != JobID_Null);
 
 			for (int i = 0; i < job_count; ++i)
 			{
-				JobID child = js.CreateJobAsChild<CounterJobData, CounterJob>(root, &counter);
+				JobID child = js.CreateJobAsChild<CounterJob>(root, CounterJobData{ &counter });
+
 				assert(child != JobID_Null);
 				js.RunJob(child);
 			}
@@ -140,12 +148,13 @@ namespace
 			js.FrameReset();
 			std::atomic<int> counter{ 0 };
 
-			JobID root = js.CreateJob<CounterJobData, CounterJob>(&counter);
+			JobID root = js.CreateJob<CounterJob>(CounterJobData{ &counter });
+
 			assert(root != JobID_Null);
 
 			for (int i = 0; i < job_count; ++i)
 			{
-				JobID child = js.CreateJobAsChild<CounterJobData, CounterJob>(root, &counter);
+				JobID child = js.CreateJobAsChild<CounterJob>(root, CounterJobData{ &counter });
 
 				assert(child != JobID_Null);
 				js.RunJob(child);
@@ -169,8 +178,9 @@ namespace
 
 		std::atomic<int> counter{ 0 };
 
-		auto a = js.CreateJob<CounterJobData, CounterJob>(&counter);
-		auto b = js.CreateJob<CounterJobData, CounterJob>(&counter);
+		auto a = js.CreateJob<CounterJob>(CounterJobData{ &counter });
+		auto b = js.CreateJob<CounterJob>(CounterJobData{ &counter });
+
 
 		js.SetContinuation(a, b);
 
@@ -189,12 +199,13 @@ namespace
 
 		constexpr int continuation_count = 1000;
 		std::atomic<int> counter{ 0 };
-		auto const root = js.CreateJob<CounterJobData, CounterJob>(&counter);
+
+		auto const root = js.CreateJob<CounterJob>(CounterJobData{ &counter });
 
 		auto prev = root;
 		for (int i{}; i < continuation_count; ++i)
 		{
-			auto next = js.CreateJob<CounterJobData, CounterJob>(&counter);
+			auto next = js.CreateJob<CounterJob>(CounterJobData{ &counter });
 			js.SetContinuation(prev, next);
 			prev = next;
 		}

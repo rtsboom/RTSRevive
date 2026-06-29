@@ -2,6 +2,7 @@
 #include <TinyGLTFv3/tiny_gltf_v3.h>
 #include <cstdint>
 #include <cstddef>
+#include <span>
 
 namespace
 {
@@ -22,20 +23,12 @@ namespace rr
 
 	struct Model
 	{
-		std::byte* geometry_buffer;
-		Material* materials;
-		MeshPrimitive* primitives;
-		Mesh* meshes;
-		SceneNode* nodes;
-
-		uint32_t geometry_buffer_size_bytes;
-		uint32_t material_count;
-		uint32_t primitive_count;
-		uint32_t mesh_count;
-		uint32_t node_count;
-
-		AnimationClip* animclips;
-		uint32_t animclip_count;
+		std::span<std::byte>	 geometries; // gpu upload buffer directly
+		std::span<Material>		 materials;
+		std::span<MeshPrimitive> primitives;
+		std::span<Mesh>			 meshes;
+		std::span<SceneNode>	 nodes;
+		std::span<AnimationClip> animclips;
 
 		uint32_t skeleton;
 	};
