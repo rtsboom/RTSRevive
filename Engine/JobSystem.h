@@ -103,30 +103,52 @@ namespace rr
 	template<auto Fn, typename ...Args>
 	inline JobID JobSystem::CreateJob(Args&& ...args)
 	{
-		using Payload = std::tuple<std::decay_t<Args>...>;
-		static_assert(sizeof(Payload) <= Job::kDataSize);
+		bool constexpr job_sys_known =
+			std::is_invocable_v<decltype(Fn), JobSystem&, JobID, std::decay_t<Args>&...>;
+		static_assert(
+			job_sys_known ||
+			std::is_invocable_v<decltype(Fn), std::decay_t<Args>&...>,
+			"Job function arguments do not match the function signature.");
+
+		using Params = std::tuple<std::decay_t<Args>...>;
+		static_assert(sizeof(Params) <= Job::kDataSize);
+		static_assert(alignof(Params) <= Job::kDataAlign);
 
 		JobID current = AllocateJob();
 		Job* current_job = GetJobFromID(current);
 		current_job->parent = JobID_Null;
 		current_job->continuation = JobID_Null;
 
-		new (current_job->data) Payload(std::forward<Args>(args)...);
+		new (current_job->data) Params(std::forward<Args>(args)...);
 
 		current_job->execute_fn = [](JobSystem& sys, JobID self, void* data)
 			{
-				auto& payload = *static_cast<Payload*>(data);
-				auto receiver = [&](auto& ...xs)
-					{
-						Fn(sys, self, xs...);
-					};
-
-				std::apply(receiver, payload);
+				auto& params = *static_cast<Params*>(data);
+				if constexpr (job_sys_known)
+				{
+					std::apply(
+						[&](auto& ...xs)
+						{
+							Fn(sys, self, xs...);
+						}, 
+						params
+					);
+				}
+				else
+				{
+					std::apply(
+						[](auto& ...xs)
+						{
+							Fn(xs...);
+						}, 
+						params
+					);
+				}
 			};
 
 		current_job->destroy_fn = [](void* data)
 			{
-				std::destroy_at(static_cast<Payload*>(data));
+				std::destroy_at(static_cast<Params*>(data));
 			};
 
 		current_job->unfinished_jobs.store(1, std::memory_order_relaxed);

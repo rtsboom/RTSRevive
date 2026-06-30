@@ -16,6 +16,8 @@ namespace rr
 	struct alignas(64) Job
 	{
 		static constexpr size_t kDataSize = 96;
+		static constexpr size_t kDataAlign = 64;
+
 		std::byte data[kDataSize] = {};
 
 		std::atomic_int32_t unfinished_jobs{ 0 };

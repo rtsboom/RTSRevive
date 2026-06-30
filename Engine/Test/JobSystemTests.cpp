@@ -6,7 +6,7 @@ namespace
 {
 	using namespace rr;
 
-	void CounterJob(JobSystem& sys, JobID self, std::atomic_int32_t* counter)
+	void CounterJob(std::atomic_int32_t* counter)
 	{
 		counter->fetch_add(1, std::memory_order_relaxed);
 	}
