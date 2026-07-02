@@ -36,6 +36,9 @@
     <ClCompile Include="VirtualMemory.cpp">
       <Filter>Core</Filter>
     </ClCompile>
+    <ClCompile Include="ModelLoadPipeline.cpp">
+      <Filter>ModelLoadPipeline</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SimpleEvent.h" />
@@ -76,6 +79,9 @@
     <ClInclude Include="DynamicArray.h">
       <Filter>Core</Filter>
     </ClInclude>
+    <ClInclude Include="ModelLoadPipeline.h">
+      <Filter>ModelLoadPipeline</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="GPU">
@@ -92,6 +98,9 @@
     </Filter>
     <Filter Include="Core">
       <UniqueIdentifier>{6b9832df-0f08-4928-bd05-030d792ede32}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ModelLoadPipeline">
+      <UniqueIdentifier>{c117486c-7f51-4e65-b1fa-3f4ab5218563}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

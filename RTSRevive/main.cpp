@@ -4,6 +4,9 @@
 #include <Engine/DynamicArray.h>
 #include <Engine/DynamicArena.h>
 
+#include <filesystem>
+#include <TinyGLTFv3/tiny_gltf_v3.h>
+#include <fstream>
 
 int RunGame(HINSTANCE hInstance, int nCmdShow);
 
@@ -18,42 +21,39 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPSTR, _In
 	using namespace rr;
 	//rr::test::RunJobSystemTests();
 
-	DynamicArray<int> darr{ 100000 };
+	std::string base_dir{ "Assets/Models/kenney_cube_pets/" };
+	std::filesystem::path path{ "Assets/Models/kenney_cube_pets/animal-beaver.glb" };
+	bool exist = std::filesystem::exists(path);
+	size_t file_size = std::filesystem::file_size(path);
+	std::vector<uint8_t> file_bytes(file_size);
 
-	darr.Resize(2000);
-	darr.Resize(1000);
-	darr.Resize(2000);
+	std::ifstream file(path, std::ios::binary);
+	file.read(reinterpret_cast<char*>(file_bytes.data()), file_size);
 
-	darr.PushBack(1);
-	darr.PushBack(2);
-	darr.PushBack(3);
-	darr.PushBack(4);
-	darr.EmplaceBack(1);
-	darr.EmplaceBack(2);
-	darr.EmplaceBack(3);
-	darr.EmplaceBack(4);
+	if (!file)
+		return 1;
 
-	auto r1 = darr.Back();
-	darr.PopBack();
-	auto r2 = darr.Back();
-	darr.PopBack();
-	auto r3 = darr.Back();
-	darr.PopBack();
-	auto r4 = darr.Back();
-	darr.PopBack();
-	darr.Clear();
-	darr.ShrinkToFit();
+	tg3_model model;
+	tg3_parse_options opts;
+	tg3_error_stack errors;
 
-	DynamicArena a{ 1 };
-	void* p = a.Allocate(1);
-	void* p1 = a.Allocate(11111111);
-	void* p2 = a.Allocate(4096);
+	tg3_parse_options_init(&opts);
+	tg3_error_stack_init(&errors);
 
-	int* pi = a.New<int>(1);
-	int* p_int_arr = a.NewArray<int>(10, 1);
+	opts.images_as_is = 1;
+	opts.validate_indices = 1;
+	opts.parse_float32 = 1;
 
-	struct M { int a; int b; double x; };
-	M* p_M_arr = a.NewArray<M>(1024);
+	tg3_error_code result = tg3_parse_auto(
+		&model,
+		&errors,
+		file_bytes.data(),
+		file_bytes.size(),
+		base_dir.data(),
+		static_cast<uint32_t>(base_dir.size()),
+		&opts);
+
+
 
 	//return RunGame(hInstance, nCmdShow);
 	return 0;
