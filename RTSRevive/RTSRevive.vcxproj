@@ -143,6 +143,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="RunGame.cpp" />
+    <ClCompile Include="test_tinygltf.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />

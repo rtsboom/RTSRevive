@@ -5,6 +5,7 @@
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="RunGame.cpp" />
+    <ClCompile Include="test_tinygltf.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
