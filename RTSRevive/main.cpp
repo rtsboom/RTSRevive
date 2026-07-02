@@ -2,6 +2,7 @@
 #include <sal.h>
 #include <Windows.h>
 #include <Engine/DynamicArray.h>
+#include <Engine/DynamicArena.h>
 
 
 int RunGame(HINSTANCE hInstance, int nCmdShow);
@@ -42,6 +43,18 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPSTR, _In
 	darr.PopBack();
 	darr.Clear();
 	darr.ShrinkToFit();
+
+	DynamicArena a{ 1 };
+	void* p = a.Allocate(1);
+	void* p1 = a.Allocate(11111111);
+	void* p2 = a.Allocate(4096);
+
+	int* pi = a.New<int>(1);
+	int* p_int_arr = a.NewArray<int>(10, 1);
+
+	struct M { int a; int b; double x; };
+	M* p_M_arr = a.NewArray<M>(1024);
+
 	//return RunGame(hInstance, nCmdShow);
 	return 0;
 }

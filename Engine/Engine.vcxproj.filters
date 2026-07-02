@@ -30,7 +30,7 @@
     <ClCompile Include="GLTFUtils.cpp">
       <Filter>GLTF</Filter>
     </ClCompile>
-    <ClCompile Include="VirtualArena.cpp">
+    <ClCompile Include="DynamicArena.cpp">
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="VirtualMemory.cpp">
@@ -67,7 +67,7 @@
       <Filter>Job</Filter>
     </ClInclude>
     <ClInclude Include="PCH\pch.h" />
-    <ClInclude Include="VirtualArena.h">
+    <ClInclude Include="DynamicArena.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="VirtualMemory.h">

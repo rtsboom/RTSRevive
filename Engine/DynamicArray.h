@@ -15,7 +15,23 @@ namespace rr
 	class DynamicArray
 	{
 	public:
-		DynamicArray(size_t max_size)
+		DynamicArray() = default;
+		DynamicArray(DynamicArray const&) = delete;
+		DynamicArray& operator=(DynamicArray const&) = delete;
+		DynamicArray(DynamicArray&& other) noexcept
+			: DynamicArray{}
+		{
+			Swap(other);
+		}
+		DynamicArray& operator=(DynamicArray&& other) noexcept
+		{
+			DynamicArray intermidiate{ std::move(other) };
+			Swap(intermidiate);
+			return *this;
+		}
+
+
+		explicit DynamicArray(size_t max_size)
 		{
 			assert(max_size > 0);
 
@@ -25,7 +41,7 @@ namespace rr
 
 			void* const ptr = VirtualMemory::Reserve(max_bytes_aligned);
 			data_ = static_cast<T*>(ptr);
-			max_size_ = max_size;
+			max_size_ = max_bytes_aligned / sizeof(T);
 			reserved_bytes_ = max_bytes_aligned;
 		}
 		~DynamicArray()
@@ -147,6 +163,18 @@ namespace rr
 		size_t Size() const noexcept { return size_; }
 		size_t Capacity() const noexcept { return capacity_; }
 		size_t MaxSize() const noexcept { return max_size_; }
+
+
+		void Swap(DynamicArray& other) noexcept
+		{
+			std::swap(data_, other.data_);
+			std::swap(size_, other.size_);
+			std::swap(capacity_, other.capacity_);
+			std::swap(max_size_, other.max_size_);
+			std::swap(committed_bytes_, other.committed_bytes_);
+			std::swap(reserved_bytes_, other.reserved_bytes_);
+		}
+
 	private:
 		T* data_{ nullptr };
 		size_t size_{ 0 };
