@@ -19,7 +19,6 @@ namespace rr
 	struct Mesh;
 	struct SceneNode;
 	struct AnimationClip;
-	struct Skeleton;
 
 	struct Model
 	{
@@ -30,7 +29,6 @@ namespace rr
 		std::span<SceneNode>	 nodes;
 		std::span<AnimationClip> animclips;
 
-		uint32_t skeleton;
 	};
 
 	struct MeshPrimitive

@@ -18,6 +18,12 @@ namespace
 
 		return s_si;
 	}
+
+	size_t AlignUp(size_t value, size_t alignment)
+	{
+		assert((alignment & (alignment - 1)) == 0); // alignment must be a power of two
+		return (value + alignment - 1) & ~(alignment - 1);
+	}
 }
 
 namespace rr
@@ -31,6 +37,16 @@ namespace rr
     {
 		return GetSystemInfoCached().dwAllocationGranularity;
     }
+
+    size_t VirtualMemory::AlignToPageSize(size_t size)
+    {
+		return AlignUp(size, GetPageSize());
+	}
+
+	size_t VirtualMemory::AlignToAllocationGranularity(size_t size)
+	{
+		return AlignUp(size, GetAllocationGranularity());
+	}
 
 	void* VirtualMemory::Reserve(size_t size)
 	{

@@ -1,8 +1,12 @@
 #pragma once
-#include <memory>
-#include <cassert>
-#include <type_traits>
 #include "VirtualMemory.h"
+#include <cassert>
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <type_traits>
+#include <algorithm>
+
 namespace rr
 {
 	// Utilize virtual memory
@@ -10,77 +14,146 @@ namespace rr
 	template<typename T>
 	class DynamicArray
 	{
-		static_assert(std::is_default_constructible_v<T>, "DynamicArray requires default constructible type");
 	public:
-		DynamicArray(size_t capacity)
+		DynamicArray(size_t max_size)
 		{
-			size_t const total_bytes = sizeof(T) * capacity;
-			first_ = static_cast<T*>(VirtualMemory::Reserve(total_bytes));
-			last_ = first_;
-			last_reserved_ = first_ + capacity;
+			assert(max_size > 0);
+
+			size_t const max_bytes = sizeof(T) * max_size;
+			size_t const max_bytes_aligned =
+				VirtualMemory::AlignToAllocationGranularity(max_bytes);
+
+			void* const ptr = VirtualMemory::Reserve(max_bytes_aligned);
+			data_ = static_cast<T*>(ptr);
+			max_size_ = max_size;
+			reserved_bytes_ = max_bytes_aligned;
 		}
 		~DynamicArray()
 		{
-			if (!first_)
+			if (!data_)
 				return;
 
-			for (T* e{ first_ }; e != last_; ++e)
+			for (size_t i{}; i < size_; ++i)
 			{
-				std::destroy_at(e);
+				std::destroy_at(&data_[i]);
 			}
 
-			VirtualMemory::Release(first_);
+			VirtualMemory::Release(data_);
 		}
-		void Resize(size_t size)
+
+		void Reserve(size_t size)
 		{
-			assert(size <= Capacity());
+			assert(size <= MaxSize());
 
-			T* const new_last = first_ + size;
-
-			if (last_ < new_last)
+			if (capacity_ < size)
 			{
-				size_t const diff = new_last - last_;
-				size_t const diff_bytes = sizeof(T) * diff;
-				VirtualMemory::Commit(last_, diff_bytes);
+				size_t const required_bytes = sizeof(T) * size;
+				size_t const required_bytes_aligned = VirtualMemory::AlignToPageSize(required_bytes);
 
-				for (T* e{ last_ }; e != new_last; ++e)
+				std::byte* const committed_end = ByteData() + committed_bytes_;
+				size_t const commit_bytes = required_bytes_aligned - committed_bytes_;
+				VirtualMemory::Commit(committed_end, commit_bytes);
+
+				committed_bytes_ = required_bytes_aligned;
+				capacity_ = committed_bytes_ / sizeof(T);
+			}
+		}
+
+		void ShrinkToFit()
+		{
+			size_t const required_bytes = sizeof(T) * size_;
+			size_t const required_bytes_aligned = VirtualMemory::AlignToPageSize(required_bytes);
+
+			if (required_bytes_aligned < committed_bytes_)
+			{
+				std::byte* const decommit_begin = ByteData() + required_bytes_aligned;
+				size_t const decommit_bytes = committed_bytes_ - required_bytes_aligned;
+				VirtualMemory::Decommit(decommit_begin, decommit_bytes);
+
+				committed_bytes_ = required_bytes_aligned;
+				capacity_ = committed_bytes_ / sizeof(T);
+			}
+		}
+
+		template<typename ...Args>
+		void Resize(size_t size, Args&& ...args)
+		{
+			static_assert(std::is_constructible_v<T, Args...>);
+
+			assert(size <= MaxSize());
+
+			if (size_ < size)
+			{
+				Reserve(size);
+
+				for (size_t i{ size_ }; i < size; ++i)
 				{
-					std::construct_at(e);
+					std::construct_at(&data_[i], std::forward<Args>(args)...);
 				}
 			}
-			else if (last_ > new_last)
+			else if (size < size_)
 			{
-				for (T* e{ new_last }; e != last_; ++e)
+				for (size_t i{ size }; i < size_; ++i)
 				{
-					std::destroy_at(e);
+					std::destroy_at(&data_[i]);
 				}
-
-				size_t const diff = last_ - new_last;
-				size_t const diff_bytes = sizeof(T) * diff;
-
-				VirtualMemory::Decommit(new_last, diff_bytes);
 			}
 
-			last_ = new_last;
+			size_ = size;
 		}
 
-		T& operator[](size_t i)
+		void Clear()
 		{
-			assert(first_);
-			assert(i < Size());
-			return first_[i];
+			Resize(0);
 		}
 
+		template<typename ...Args>
+		void EmplaceBack(Args&& ...args)
+		{
+			static_assert(std::is_constructible_v<T, Args...>);
+			Reserve(size_ + 1);
+			std::construct_at(&data_[size_++], std::forward<Args>(args)...);
+		}
 
-		size_t Size() const noexcept { return last_ - first_; }
-		size_t Capacity() const noexcept { return last_reserved_ - first_; }
+		void PushBack(T const& value)
+		{
+			Reserve(size_ + 1);
+			std::construct_at(&data_[size_++], value);
+		}
 
-		T* Data() const noexcept { return first_; }
+		void PushBack(T&& value)
+		{
+			Reserve(size_ + 1);
+			std::construct_at(&data_[size_++], std::move(value));
+		}
 
+		void PopBack()
+		{
+			assert(0 < size_);
+			std::destroy_at(&data_[--size_]);
+		}
+
+		T& operator[](size_t i) { return data_[i]; }
+		T const& operator[](size_t i) const { return data_[i]; }
+
+		T& Front() { return data_[0]; }
+		T& Back() { return data_[size_ - 1]; }
+		T const& Front() const { return data_[0]; }
+		T const& Back() const { return data_[size_ - 1]; }
+
+		T* Data() const noexcept { return data_; }
+		std::byte* ByteData() const noexcept { return reinterpret_cast<std::byte*>(data_); }
+
+		size_t Size() const noexcept { return size_; }
+		size_t Capacity() const noexcept { return capacity_; }
+		size_t MaxSize() const noexcept { return max_size_; }
 	private:
-		T* first_{ nullptr };
-		T* last_{ nullptr };
-		T* last_reserved_{ nullptr };
+		T* data_{ nullptr };
+		size_t size_{ 0 };
+		size_t capacity_{ 0 };
+		size_t max_size_{ 0 };
+		size_t committed_bytes_{ 0 };
+		size_t reserved_bytes_{ 0 };
 	};
 
 }
