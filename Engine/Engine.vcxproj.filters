@@ -2,7 +2,6 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="cpp.hint" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="GPUDevice.cpp">
@@ -23,7 +22,6 @@
     <ClCompile Include="JobPool.cpp">
       <Filter>Job</Filter>
     </ClCompile>
-    <ClCompile Include="PCH\pch.cpp" />
     <ClCompile Include="Test\JobSystemTests.cpp">
       <Filter>Test</Filter>
     </ClCompile>
@@ -38,6 +36,12 @@
     </ClCompile>
     <ClCompile Include="ModelLoadPipeline.cpp">
       <Filter>ModelLoadPipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="PCH\pch.cpp">
+      <Filter>PCH</Filter>
+    </ClCompile>
+    <ClCompile Include="FileBatch.cpp">
+      <Filter>Core</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -69,7 +73,6 @@
     <ClInclude Include="SPMCQueue.h">
       <Filter>Job</Filter>
     </ClInclude>
-    <ClInclude Include="PCH\pch.h" />
     <ClInclude Include="DynamicArena.h">
       <Filter>Core</Filter>
     </ClInclude>
@@ -81,6 +84,12 @@
     </ClInclude>
     <ClInclude Include="ModelLoadPipeline.h">
       <Filter>ModelLoadPipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="PCH\pch.h">
+      <Filter>PCH</Filter>
+    </ClInclude>
+    <ClInclude Include="FileBatch.h">
+      <Filter>Core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -101,6 +110,9 @@
     </Filter>
     <Filter Include="ModelLoadPipeline">
       <UniqueIdentifier>{c117486c-7f51-4e65-b1fa-3f4ab5218563}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PCH">
+      <UniqueIdentifier>{041cda9c-4229-499b-b5a2-b9b2f7554058}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>
