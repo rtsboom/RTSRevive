@@ -18,6 +18,7 @@ namespace rr
 
 
 	public:
+		size_t MaxSize() const noexcept { return reserved_bytes_; }
 		size_t GetMarker() const noexcept { return used_bytes; }
 		void Rollback(size_t marker);
 		void Clear() noexcept { used_bytes = 0; }

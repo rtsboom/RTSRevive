@@ -6,16 +6,6 @@
 #include <string_view>
 #include <fstream>
 #include <filesystem>
-#include <cassert>
-
-namespace
-{
-	size_t AlignUp(size_t size, size_t alignment)
-	{
-		assert(alignment > 0 && (alignment & (alignment - 1)) == 0);
-		return (size + alignment - 1) & ~(alignment - 1);
-	}
-}
 
 namespace rr
 {
@@ -36,14 +26,19 @@ namespace rr
 
 		size_t const blob_size = static_cast<size_t>(end);
 		file.seekg(0, std::ios::beg);
+		if (!file)
+		{
+			return false;
+		}
 
 		constexpr size_t blob_alignment = 16;
 
 		size_t const path_offset = sizeof(FileBlob);
-		size_t const path_size = path_str.size();
+		size_t const path_size = path_str.size() + 1; // include null terminator
 		size_t const blob_offset = AlignUp(path_offset + path_size, blob_alignment);
 		size_t const total_size = blob_offset + blob_size;
 
+		auto const marker = arena_.GetMarker();
 		void* const ptr = arena_.Allocate(total_size, blob_alignment);
 		if (!ptr)
 		{
@@ -54,14 +49,15 @@ namespace rr
 
 		char* const base = static_cast<char*>(ptr);
 		char* const path_begin = base + path_offset;
-		std::memcpy(path_begin, path_str.data(), path_str.size());
-		file_blob->path = { path_begin, path_size };
+		std::memcpy(path_begin, path_str.c_str(), path_size);
+		file_blob->path = { path_begin, path_size - 1 };
 
 		// read file
 		char* const blob_begin = base + blob_offset;
 		file.read(blob_begin, blob_size);
 		if (!file) // check if read was successful
 		{
+			arena_.Rollback(marker);
 			return false;
 		}
 

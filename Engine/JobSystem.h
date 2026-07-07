@@ -116,6 +116,8 @@ namespace rr
 
 		JobID current = AllocateJob();
 		Job* current_job = GetJobFromID(current);
+		current_job->unfinished_jobs.store(1, std::memory_order_relaxed);
+
 		current_job->parent = JobID_Null;
 		current_job->continuation = JobID_Null;
 
@@ -151,7 +153,6 @@ namespace rr
 				std::destroy_at(static_cast<Params*>(data));
 			};
 
-		current_job->unfinished_jobs.store(1, std::memory_order_relaxed);
 		return current;
 
 	}
@@ -159,11 +160,14 @@ namespace rr
 	template<auto Fn, typename ...Args>
 	inline JobID JobSystem::CreateJobAsChild(JobID parent, Args&& ...args)
 	{
+
+
+		Job* parent_job = GetJobFromID(parent);
+		parent_job->unfinished_jobs.fetch_add(1, std::memory_order_relaxed);
+
 		JobID current = CreateJob<Fn>(std::forward<Args>(args)...);
 		Job* current_job = GetJobFromID(current);
-		Job* parent_job = GetJobFromID(parent);
 		current_job->parent = parent;
-		parent_job->unfinished_jobs.fetch_add(1, std::memory_order_relaxed);
 
 		return current;
 	}

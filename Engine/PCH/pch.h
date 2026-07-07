@@ -50,12 +50,12 @@ namespace rr
 
 // MathUtils
 // TODO: Move this to a more appropriate location.
-size_t IsPowerOfTwo(size_t value)
+inline size_t IsPowerOfTwo(size_t value)
 {
 	return value != 0 && (value & (value - 1)) == 0;
 }
 
-size_t AlignUp(size_t value, size_t alignment)
+inline size_t AlignUp(size_t value, size_t alignment)
 {
 	RR_ASSERT_MSG(IsPowerOfTwo(alignment), "alignment must be a power of two");
 

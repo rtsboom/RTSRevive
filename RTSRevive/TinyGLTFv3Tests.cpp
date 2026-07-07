@@ -8,7 +8,7 @@
 
 namespace rr::test
 {
-	bool RunTinyGltfTests()
+	bool TestTinyGLTFv3()
 	{
 		std::string base_dir{ "Assets/Models/kenney_cube_pets/" };
 		std::filesystem::path path{ "Assets/Models/kenney_cube_pets/animal-beaver.glb" };
@@ -47,6 +47,10 @@ namespace rr::test
 
 		if (result != TG3_OK)
 			return false;
+
+		//release
+		tg3_model_free(&model);
+		tg3_error_stack_free(&errors);
 
 		return true;
 	}

@@ -191,10 +191,16 @@ namespace rr
 		Job* job = GetJobFromID(id);
 		assert(job);
 		(job->execute_fn)(*this, id, job->data);
-		FinishJob(id);
-
+		
 		// for stats
 		++tls_self_->executed_jobs;
+
+		// IMPORTANT:
+		// FinishJob() must be the last step of job execution.
+		// WaitJob() may return immediately after Finish() completes the root job, so
+		// no observable side effects should occur after this call.
+		FinishJob(id);
+
 	}
 
 	void JobSystem::FinishJob(JobID id)
@@ -202,16 +208,18 @@ namespace rr
 		Job* job = GetJobFromID(id);
 		assert(job);
 
-		uint32_t const unfinished = job->unfinished_jobs.fetch_sub(1, std::memory_order_acq_rel) - 1;
+		int32_t const unfinished = job->unfinished_jobs.fetch_sub(1, std::memory_order_acq_rel) - 1;
+		assert(unfinished >= 0);
+
 		if (unfinished == 0)
 		{
+			job->destroy_fn(job->data);
+
 			if (job->parent != JobID_Null)
 				FinishJob(job->parent);
 
 			if (job->continuation != JobID_Null)
 				RunJob(job->continuation);
-
-			job->destroy_fn(job->data);
 		}
 	}
 
