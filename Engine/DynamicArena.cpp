@@ -32,13 +32,13 @@ namespace rr
 
 	DynamicArena::~DynamicArena()
 	{
-		if (!data_)
-			return;
-
-		VirtualMemory::Release(data_);
+		if (data_)
+		{
+			VirtualMemory::Release(data_);
+		}
 	}
 
-	void DynamicArena::RollBack(size_t marker)
+	void DynamicArena::Rollback(size_t marker)
 	{
 		RR_CHECK(marker <= used_bytes);
 
@@ -47,7 +47,7 @@ namespace rr
 
 	void DynamicArena::Reset()
 	{
-		assert(data_);
+		RR_ASSERT(data_ != nullptr);
 
 		VirtualMemory::Decommit(data_, committed_bytes_);
 		committed_bytes_ = 0;
@@ -55,13 +55,11 @@ namespace rr
 	}
 	void* DynamicArena::Allocate(size_t size, size_t alignment)
 	{
-		assert(data_);
-		assert(size > 0);
+		RR_ASSERT(data_ != nullptr);
+		RR_ASSERT(size > 0);
+		RR_ASSERT(IsPowerOfTwo(alignment));
 
-		// alignment must be a power of two
-		assert(alignment > 0 && (alignment & (alignment - 1)) == 0); 
-
-		size_t const start_bytes = (used_bytes + alignment - 1) & ~(alignment - 1);
+		size_t const start_bytes = AlignUp(used_bytes, alignment);
 		size_t const finish_bytes = start_bytes + size;
 
 		if (reserved_bytes_ < finish_bytes)

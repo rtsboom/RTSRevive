@@ -19,7 +19,7 @@ namespace rr
 
 	public:
 		size_t GetMarker() const noexcept { return used_bytes; }
-		void RollBack(size_t marker);
+		void Rollback(size_t marker);
 		void Clear() noexcept { used_bytes = 0; }
 		void Reset();
 		void* Allocate(size_t size, size_t alignment = alignof(std::max_align_t));
