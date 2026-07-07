@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "DynamicArena.h"
 #include "VirtualMemory.h"
-#include <cassert>
+#include "Asserts.h"
 #include <cstddef>
 #include <utility>
 
@@ -9,12 +9,11 @@ namespace rr
 {
 	DynamicArena::DynamicArena(size_t max_size)
 	{
-		assert(max_size > 0);
+		RR_ASSERT(max_size > 0);
 
 		size_t const max_size_aligned = VirtualMemory::AlignToAllocationGranularity(max_size);
 
 		void* ptr = VirtualMemory::Reserve(max_size_aligned);
-		assert(ptr);
 
 		data_ = static_cast<std::byte*>(ptr);
 		reserved_bytes_ = max_size_aligned;
@@ -39,9 +38,11 @@ namespace rr
 		VirtualMemory::Release(data_);
 	}
 
-	void DynamicArena::Clear() noexcept
+	void DynamicArena::RollBack(size_t marker)
 	{
-		used_bytes = 0;
+		RR_CHECK(marker <= used_bytes);
+
+		used_bytes = marker;
 	}
 
 	void DynamicArena::Reset()

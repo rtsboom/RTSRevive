@@ -43,6 +43,9 @@
     <ClCompile Include="FileBatch.cpp">
       <Filter>Core</Filter>
     </ClCompile>
+    <ClCompile Include="Asserts.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SimpleEvent.h" />
@@ -89,6 +92,9 @@
       <Filter>PCH</Filter>
     </ClInclude>
     <ClInclude Include="FileBatch.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Asserts.h">
       <Filter>Core</Filter>
     </ClInclude>
   </ItemGroup>

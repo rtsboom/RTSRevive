@@ -43,21 +43,22 @@ namespace rr
 	using DirectX::TexMetadata;
 }
 
-#include <stdexcept>
+#include <Engine/Asserts.h>
+#define RR_D3D_CHECK(hr) RR_CHECK(SUCCEEDED(hr))
+#define RR_CHECK_WIN32(expr) RR_CHECK_MSG_ERR((expr), "Win32 API call failed", GetLastError())
+#define RR_CHECK_MSG_WIN32(expr, msg) RR_CHECK_MSG_ERR((expr), msg, GetLastError())
 
+// MathUtils
+// TODO: Move this to a more appropriate location.
+size_t IsPowerOfTwo(size_t value)
+{
+	return value != 0 && (value & (value - 1)) == 0;
+}
 
-#ifdef _DEBUG
-#define RR_D3D_CHECK(hr) \
-    do { if (FAILED(hr)) { __debugbreak(); } } while (false)
-#else
-#define RR_D3D_CHECK(hr) \
-    do { if (FAILED(hr)) { std::abort(); } } while (false)
-#endif
+size_t AlignUp(size_t value, size_t alignment)
+{
+	RR_ASSERT_MSG(IsPowerOfTwo(alignment), "alignment must be a power of two");
 
-#ifdef _DEBUG
-#define  RR_CHECK(condition) \
-	do { if (!(condition)) { __debugbreak(); } } while (false)
-#else
-#define  RR_CHECK(condition) \
-	do { if (!(condition)) { std::abort(); } } while (false)
-#endif
+	return (value + alignment - 1) & ~(alignment - 1);
+}
+

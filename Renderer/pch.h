@@ -1,9 +1,7 @@
 #pragma once
 // Precompiled header for the Renderer project
 
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
+#include <Shared/RR_Framework.h>
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -46,5 +44,5 @@ namespace rrv
 #include <utility>
 #include <stdexcept>
 
-#include <Common/MathUtils.h>
-#include <Common/CastUtils.h>
+#include <Shared/MathUtils.h>
+#include <Shared/CastUtils.h>
