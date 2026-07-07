@@ -176,6 +176,7 @@
     <ClInclude Include="SimpleEvent.h" />
     <ClInclude Include="SPMCQueue.h" />
     <ClInclude Include="DynamicArena.h" />
+    <ClInclude Include="Timer.h" />
     <ClInclude Include="VirtualMemory.h" />
     <ClInclude Include="WorkStealingQueue.h" />
   </ItemGroup>

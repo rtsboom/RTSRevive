@@ -97,6 +97,9 @@
     <ClInclude Include="Asserts.h">
       <Filter>Core</Filter>
     </ClInclude>
+    <ClInclude Include="Timer.h">
+      <Filter>Core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="GPU">

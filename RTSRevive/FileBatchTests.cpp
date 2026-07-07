@@ -2,11 +2,10 @@
 #include <Engine/Asserts.h>
 #include <Engine/FileBatch.h>
 #include <Engine/JobSystem.h>
+#include <Engine/Timer.h>
 #include <TinyGLTFv3/tiny_gltf_v3.h>
 #include <filesystem>
 #include <string_view>
-#include <vector>
-
 namespace
 {
 	using namespace rr;
@@ -107,13 +106,19 @@ namespace
 
 	void PlayWithJobSystem()
 	{
-		JobSystem job_system;
-		job_system.Initialize(4); // 4 worker threads
+		char debug_msg[256];
 
-		size_t const capacity_bytes = 1024 * 1024;
+		Timer timer;
+
+		JobSystem job_system;
+		job_system.Initialize(8);
+
+		size_t const capacity_bytes = 64 * 1024 * 1024;
 		rr::FileBatch batch(capacity_bytes);
 		std::filesystem::path test_file_path1 = "Assets/Models/kenney_cube_pets/animal-beaver.glb";
 		std::filesystem::path test_file_path2 = "Assets/Models/kenney_cube_pets/animal-cat.glb";
+
+		timer.Reset();
 
 		size_t count = 0;
 		bool result = true;
@@ -128,6 +133,12 @@ namespace
 				++count;
 		}
 
+		double file_read_ms = timer.ElapsedMilliseconds();
+		std::snprintf(debug_msg, sizeof(debug_msg), "FileBatch read %zu files in %.3f ms\n", count, file_read_ms);
+		OutputDebugStringA(debug_msg);
+
+		timer.Reset();
+
 		JobID root = job_system.CreateJob<FileBatchTestJob>(&batch);
 		job_system.RunJob(root);
 		job_system.WaitJob(root);
@@ -135,6 +146,10 @@ namespace
 
 		RR_CHECK(job_system.GetTotalExecutedJobs() == count + 1);
 
+
+		double parse_ms = timer.ElapsedMilliseconds();
+		std::snprintf(debug_msg, sizeof(debug_msg), "FileBatch parsed %zu files in %.3f ms\n", count, parse_ms);
+		OutputDebugStringA(debug_msg);
 
 		job_system.Shutdown();
 	}
