@@ -212,7 +212,7 @@ namespace
 }
 namespace rr::test
 {
-	void RunJobSystemTests()
+	void TestJobSystem()
 	{
 		BasicExecute();
 		ManyIndependentJobs();

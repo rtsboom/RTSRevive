@@ -124,9 +124,11 @@ namespace
 		a.PushBack(3);
 
 		StableArray<int> b(std::move(a));
+
+	#pragma warning(suppress : 26800)
+		RR_CHECK(a.Size() == 0);
 		RR_CHECK(b.Size() == 3);
 		RR_CHECK(b[0] == 1 && b[1] == 2 && b[2] == 3);
-		RR_CHECK(a.Size() == 0);
 
 		StableArray<int> c(16);
 		c.PushBack(99);
@@ -134,8 +136,8 @@ namespace
 		RR_CHECK(c.Size() == 3 && c[0] == 1);
 
 		// self-move-assignment
-		StableArray<int>& selfRef = c;
-		c = std::move(selfRef);
+		StableArray<int>& self_ref = c;
+		c = std::move(self_ref);
 		RR_CHECK(c.Size() == 3 && c[0] == 1);
 	}
 
