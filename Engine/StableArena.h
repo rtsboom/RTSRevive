@@ -56,15 +56,17 @@ namespace rr
 			return ptr;
 		}
 
-		template<typename T, typename ...Args>
-		T* NewArray(size_t count, Args&& ...args)
+		template<typename T>
+		T* NewArray(size_t count)
 		{
+			static_assert(std::is_default_constructible_v<T>);
+
 			T* ptr = Allocate<T>(count);
 			if (ptr)
 			{
 				for (size_t i{}; i < count; ++i)
 				{
-					std::construct_at(&ptr[i], std::forward<Args>(args)...);
+					std::construct_at(&ptr[i]);
 				}
 			}
 			return ptr;

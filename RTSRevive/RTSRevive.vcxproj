@@ -145,6 +145,7 @@
     </ClCompile>
     <ClCompile Include="RunGame.cpp" />
     <ClCompile Include="StableArrayTests.cpp" />
+    <ClCompile Include="StableArenaTests.cpp" />
     <ClCompile Include="TinyGLTFv3Tests.cpp" />
   </ItemGroup>
   <ItemGroup>

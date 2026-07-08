@@ -138,6 +138,8 @@ namespace
 		// self-move-assignment
 		StableArray<int>& self_ref = c;
 		c = std::move(self_ref);
+
+	#pragma warning(suppress : 26800)
 		RR_CHECK(c.Size() == 3 && c[0] == 1);
 	}
 
