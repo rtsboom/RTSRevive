@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "DynamicArena.h"
+#include "StableArena.h"
 #include "VirtualMemory.h"
 #include "Asserts.h"
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace rr
 {
-	DynamicArena::DynamicArena(size_t max_size)
+	StableArena::StableArena(size_t max_size)
 	{
 		RR_ASSERT(max_size > 0);
 
@@ -18,19 +18,8 @@ namespace rr
 		data_ = static_cast<std::byte*>(ptr);
 		reserved_bytes_ = max_size_aligned;
 	}
-	DynamicArena::DynamicArena(DynamicArena&& other) noexcept
-		: DynamicArena{}
-	{
-		Swap(other);
-	}
-	DynamicArena& DynamicArena::operator=(DynamicArena&& other) noexcept
-	{
-		DynamicArena intermidiate{ std::move(other) };
-		Swap(intermidiate);
-		return *this;
-	}
-
-	DynamicArena::~DynamicArena()
+	
+	StableArena::~StableArena()
 	{
 		if (data_)
 		{
@@ -38,28 +27,28 @@ namespace rr
 		}
 	}
 
-	void DynamicArena::Rollback(size_t marker)
+	void StableArena::Rollback(size_t marker)
 	{
-		RR_CHECK(marker <= used_bytes);
+		RR_CHECK(marker <= used_bytes_);
 
-		used_bytes = marker;
+		used_bytes_ = marker;
 	}
 
-	void DynamicArena::Reset()
+	void StableArena::Decommit()
 	{
 		RR_ASSERT(data_ != nullptr);
 
 		VirtualMemory::Decommit(data_, committed_bytes_);
 		committed_bytes_ = 0;
-		used_bytes = 0;
+		used_bytes_ = 0;
 	}
-	void* DynamicArena::Allocate(size_t size, size_t alignment)
+	void* StableArena::Allocate(size_t size, size_t alignment)
 	{
 		RR_ASSERT(data_ != nullptr);
 		RR_ASSERT(size > 0);
 		RR_ASSERT(IsPowerOfTwo(alignment));
 
-		size_t const start_bytes = AlignUp(used_bytes, alignment);
+		size_t const start_bytes = AlignUp(used_bytes_, alignment);
 		size_t const finish_bytes = start_bytes + size;
 
 		if (reserved_bytes_ < finish_bytes)
@@ -76,17 +65,9 @@ namespace rr
 			committed_bytes_ = finish_bytes_aligned;
 		}
 
-		used_bytes = finish_bytes;
+		used_bytes_ = finish_bytes;
 
 		std::byte* const allocation_begin = data_ + start_bytes;
 		return allocation_begin;
-	}
-
-	void DynamicArena::Swap(DynamicArena& other) noexcept
-	{
-		std::swap(data_, other.data_);
-		std::swap(used_bytes, other.used_bytes);
-		std::swap(committed_bytes_, other.committed_bytes_);
-		std::swap(reserved_bytes_, other.reserved_bytes_);
 	}
 }

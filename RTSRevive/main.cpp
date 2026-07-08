@@ -1,9 +1,7 @@
 #include "pch.h"
 #include <sal.h>
 #include <Windows.h>
-#include <Engine/DynamicArray.h>
-#include <Engine/DynamicArena.h>
-
+#include <Engine/StableArray.h>
 
 
 int RunGame(HINSTANCE hInstance, int nCmdShow);
@@ -20,8 +18,9 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPSTR, _In
 {
 	using namespace rr;
 	//rr::test::RunJobSystemTests();
+	//rr::test::TestFileBatch();
+	StableArray<int> arr(10);
 
-	rr::test::TestFileBatch();
 
 	//return RunGame(hInstance, nCmdShow);
 	return 0;

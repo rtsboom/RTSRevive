@@ -12,26 +12,25 @@ namespace rr
 	// Utilize virtual memory
 
 	template<typename T>
-	class DynamicArray
+	class StableArray
 	{
 	public:
-		DynamicArray() = default;
-		DynamicArray(DynamicArray const&) = delete;
-		DynamicArray& operator=(DynamicArray const&) = delete;
-		DynamicArray(DynamicArray&& other) noexcept
-			: DynamicArray{}
+		StableArray() = default;
+		StableArray(StableArray const&) = delete;
+		StableArray& operator=(StableArray const&) = delete;
+		StableArray(StableArray&& other) noexcept
+			: StableArray{}
 		{
 			Swap(other);
 		}
-		DynamicArray& operator=(DynamicArray&& other) noexcept
+		StableArray& operator=(StableArray&& other) noexcept
 		{
-			DynamicArray intermidiate{ std::move(other) };
+			StableArray intermidiate{ std::move(other) };
 			Swap(intermidiate);
 			return *this;
 		}
 
-
-		explicit DynamicArray(size_t max_size)
+		explicit StableArray(size_t max_size)
 		{
 			assert(max_size > 0);
 
@@ -44,7 +43,7 @@ namespace rr
 			max_size_ = max_bytes_aligned / sizeof(T);
 			reserved_bytes_ = max_bytes_aligned;
 		}
-		~DynamicArray()
+		~StableArray()
 		{
 			if (!data_)
 				return;
@@ -57,13 +56,13 @@ namespace rr
 			VirtualMemory::Release(data_);
 		}
 
-		void Reserve(size_t size)
+		void Reserve(size_t new_capacity)
 		{
-			assert(size <= MaxSize());
+			assert(new_capacity <= MaxSize());
 
-			if (capacity_ < size)
+			if (capacity_ < new_capacity)
 			{
-				size_t const required_bytes = sizeof(T) * size;
+				size_t const required_bytes = sizeof(T) * new_capacity;
 				size_t const required_bytes_aligned = VirtualMemory::AlignToPageSize(required_bytes);
 
 				std::byte* const committed_end = ByteData() + committed_bytes_;
@@ -91,20 +90,37 @@ namespace rr
 			}
 		}
 
-		template<typename ...Args>
-		void Resize(size_t size, Args&& ...args)
+		void Resize(size_t size)
 		{
-			static_assert(std::is_constructible_v<T, Args...>);
+			static_assert(std::is_default_constructible_v<T>);
 
 			assert(size <= MaxSize());
 
 			if (size_ < size)
 			{
 				Reserve(size);
+				for (size_t i{ size_ }; i < size; ++i)
+					std::construct_at(&data_[i]);   // default construct
+			}
+			else if (size < size_)
+			{
+				for (size_t i{ size }; i < size_; ++i)
+					std::destroy_at(&data_[i]);
+			}
 
+			size_ = size;
+		}
+
+		void Resize(size_t size, T const& value)
+		{
+			assert(size <= MaxSize());
+
+			if (size_ < size)
+			{
+				Reserve(size);
 				for (size_t i{ size_ }; i < size; ++i)
 				{
-					std::construct_at(&data_[i], std::forward<Args>(args)...);
+					std::construct_at(&data_[i], value);
 				}
 			}
 			else if (size < size_)
@@ -157,15 +173,20 @@ namespace rr
 		T const& Front() const { return data_[0]; }
 		T const& Back() const { return data_[size_ - 1]; }
 
-		T* Data() const noexcept { return data_; }
-		std::byte* ByteData() const noexcept { return reinterpret_cast<std::byte*>(data_); }
 
 		size_t Size() const noexcept { return size_; }
 		size_t Capacity() const noexcept { return capacity_; }
 		size_t MaxSize() const noexcept { return max_size_; }
 
+		T* Data() noexcept { return data_; }
+		T const* Data() const noexcept { return data_; }
 
-		void Swap(DynamicArray& other) noexcept
+	private:
+		std::byte* ByteData() noexcept { return reinterpret_cast<std::byte*>(data_); }
+		std::byte const* ByteData() const noexcept { return reinterpret_cast<std::byte const*>(data_); }
+
+	public:
+		void Swap(StableArray& other) noexcept
 		{
 			std::swap(data_, other.data_);
 			std::swap(size_, other.size_);
@@ -183,5 +204,4 @@ namespace rr
 		size_t committed_bytes_{ 0 };
 		size_t reserved_bytes_{ 0 };
 	};
-
 }

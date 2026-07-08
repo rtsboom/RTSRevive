@@ -38,7 +38,7 @@ namespace rr
 		size_t const blob_offset = AlignUp(path_offset + path_size, blob_alignment);
 		size_t const total_size = blob_offset + blob_size;
 
-		auto const marker = arena_.GetMarker();
+		auto const marker = arena_.UsedSize();
 		void* const ptr = arena_.Allocate(total_size, blob_alignment);
 		if (!ptr)
 		{

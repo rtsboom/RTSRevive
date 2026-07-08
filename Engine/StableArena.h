@@ -5,24 +5,35 @@
 #include <utility>
 namespace rr
 {
-	class DynamicArena
+	class StableArena
 	{
 	public:
-		DynamicArena() = default;
-		explicit DynamicArena(size_t max_size);
-		DynamicArena(DynamicArena const&) = delete;
-		DynamicArena& operator=(DynamicArena const&) = delete;
-		DynamicArena(DynamicArena&& other) noexcept;
-		DynamicArena& operator=(DynamicArena&& other) noexcept;
-		~DynamicArena();
+		StableArena() = default;
+		StableArena(StableArena const&) = delete;
+		StableArena& operator=(StableArena const&) = delete;
+		StableArena(StableArena&& other) noexcept
+			: StableArena{}
+		{
+			Swap(other);
+		}
+		StableArena& operator=(StableArena&& other) noexcept
+		{
+			StableArena intermidiate{ std::move(other) };
+			Swap(intermidiate);
+			return *this;
+		}
+
+		explicit StableArena(size_t max_size);
+		~StableArena();
 
 
 	public:
-		size_t MaxSize() const noexcept { return reserved_bytes_; }
-		size_t GetMarker() const noexcept { return used_bytes; }
+		size_t ReservedSize() const noexcept { return reserved_bytes_; }
+		size_t CommittedSize() const noexcept { return committed_bytes_; }
+		size_t UsedSize() const noexcept { return used_bytes_; }
 		void Rollback(size_t marker);
-		void Clear() noexcept { used_bytes = 0; }
-		void Reset();
+		void Rewind() noexcept { Rollback(0); }
+		void Decommit();
 		void* Allocate(size_t size, size_t alignment = alignof(std::max_align_t));
 
 		template<typename T>
@@ -60,11 +71,17 @@ namespace rr
 		}
 
 	public:
-		void Swap(DynamicArena& other) noexcept;
+		void Swap(StableArena& other) noexcept
+		{
+			std::swap(data_, other.data_);
+			std::swap(used_bytes_, other.used_bytes_);
+			std::swap(committed_bytes_, other.committed_bytes_);
+			std::swap(reserved_bytes_, other.reserved_bytes_);
+		}
 
 	private:
 		std::byte* data_{ nullptr };
-		size_t used_bytes{ 0 };
+		size_t used_bytes_{ 0 };
 		size_t committed_bytes_{ 0 };
 		size_t reserved_bytes_{ 0 };
 	};

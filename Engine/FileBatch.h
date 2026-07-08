@@ -1,5 +1,5 @@
 #pragma once
-#include <Engine/DynamicArena.h>
+#include <Engine/StableArena.h>
 #include <cstddef>
 #include <string_view>
 #include <filesystem>
@@ -19,11 +19,11 @@ namespace rr
 		FileBatch() = default;
 		FileBatch(size_t capacity_bytes)
 		{
-			arena_ = DynamicArena(capacity_bytes);
+			arena_ = StableArena(capacity_bytes);
 		}
 
 		bool AddFile(std::filesystem::path file_path);
-		void Clear() { arena_.Clear(); first_ = nullptr; last_ = nullptr; }
+		void Clear() { arena_.Rewind(); first_ = nullptr; last_ = nullptr; }
 
 	public:
 		template<typename Fn>
@@ -41,11 +41,11 @@ namespace rr
 
 
 	public:
-		size_t GetArenaMaxSize() const noexcept { return arena_.MaxSize(); }
-		size_t GetUsedBytes() const noexcept { return arena_.GetMarker(); }
+		size_t GetArenaMaxSize() const noexcept { return arena_.ReservedSize(); }
+		size_t GetUsedBytes() const noexcept { return arena_.UsedSize(); }
 
 	private:
-		DynamicArena arena_;
+		StableArena arena_;
 		FileBlob* first_{ nullptr };
 		FileBlob* last_{ nullptr };
 	};

@@ -28,7 +28,7 @@
     <ClCompile Include="GLTFUtils.cpp">
       <Filter>GLTF</Filter>
     </ClCompile>
-    <ClCompile Include="DynamicArena.cpp">
+    <ClCompile Include="StableArena.cpp">
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="VirtualMemory.cpp">
@@ -76,13 +76,13 @@
     <ClInclude Include="SPMCQueue.h">
       <Filter>Job</Filter>
     </ClInclude>
-    <ClInclude Include="DynamicArena.h">
+    <ClInclude Include="StableArena.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="VirtualMemory.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="DynamicArray.h">
+    <ClInclude Include="StableArray.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="ModelLoadPipeline.h">
