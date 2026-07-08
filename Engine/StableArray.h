@@ -113,6 +113,7 @@ namespace rr
 
 		void Resize(size_t size, T const& value)
 		{
+			static_assert(std::is_copy_constructible_v<T>);
 			assert(size <= MaxSize());
 
 			if (size_ < size)

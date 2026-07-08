@@ -11,6 +11,9 @@
     <ClCompile Include="FileBatchTests.cpp">
       <Filter>Test</Filter>
     </ClCompile>
+    <ClCompile Include="StableArrayTests.cpp">
+      <Filter>Test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />

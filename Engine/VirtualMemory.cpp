@@ -46,7 +46,7 @@ namespace rr
 		RR_ASSERT(size == AlignToAllocationGranularity(size));
 
 		void* p = VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_NOACCESS);
-		RR_CHECK_MSG_WIN32(
+		RR_CHECK_WIN32_MSG(
 			p != nullptr, 
 			"VirtualMemory::Reserve failed.");
 
@@ -59,7 +59,7 @@ namespace rr
 		RR_ASSERT(size > 0);
 		RR_ASSERT(size == AlignToPageSize(size));
 
-		RR_CHECK_MSG_WIN32(
+		RR_CHECK_WIN32_MSG(
 			VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE), 
 			"VirtualMemory::Commit failed.");
 	}
@@ -71,7 +71,7 @@ namespace rr
 		RR_ASSERT(size == AlignToPageSize(size));
 
 	#pragma warning(suppress: 6250) // intended to decommit memory, not release it
-		RR_CHECK_MSG_WIN32(
+		RR_CHECK_WIN32_MSG(
 			VirtualFree(ptr, size, MEM_DECOMMIT),
 			"VirtualMemory::Decommit failed.");
 	}
@@ -80,7 +80,7 @@ namespace rr
 	{
 		RR_ASSERT(ptr != nullptr);
 
-		RR_CHECK_MSG_WIN32(
+		RR_CHECK_WIN32_MSG(
 			VirtualFree(ptr, 0, MEM_RELEASE),
 			"VirtualMemory::Release failed.");
 	}

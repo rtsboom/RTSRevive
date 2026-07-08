@@ -144,6 +144,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="RunGame.cpp" />
+    <ClCompile Include="StableArrayTests.cpp" />
     <ClCompile Include="TinyGLTFv3Tests.cpp" />
   </ItemGroup>
   <ItemGroup>

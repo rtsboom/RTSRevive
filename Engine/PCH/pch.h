@@ -45,8 +45,8 @@ namespace rr
 
 #include <Engine/Asserts.h>
 #define RR_D3D_CHECK(hr) RR_CHECK(SUCCEEDED(hr))
-#define RR_CHECK_WIN32(expr) RR_CHECK_MSG_ERR((expr), "Win32 API call failed", GetLastError())
-#define RR_CHECK_MSG_WIN32(expr, msg) RR_CHECK_MSG_ERR((expr), msg, GetLastError())
+#define RR_CHECK_WIN32(expr) RR_CHECK_CODE_MSG((expr), GetLastError(), "Win32 API call failed")
+#define RR_CHECK_WIN32_MSG(expr, msg) RR_CHECK_CODE_MSG((expr), GetLastError(), msg)
 
 // MathUtils
 // TODO: Move this to a more appropriate location.
