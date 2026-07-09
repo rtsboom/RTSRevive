@@ -58,26 +58,6 @@ namespace
 		RR_CHECK(IsAligned(p4, 64));
 	}
 
-	void TestStableArena_AllocateTyped()
-	{
-		rr::StableArena arena{ 1024 * 1024 };
-
-		int* values = arena.Allocate<int>(16);
-
-		RR_CHECK(values != nullptr);
-		RR_CHECK(IsAligned(values, alignof(int)));
-
-		for (int i = 0; i < 16; ++i)
-		{
-			values[i] = i;
-		}
-
-		for (int i = 0; i < 16; ++i)
-		{
-			RR_CHECK(values[i] == i);
-		}
-	}
-
 	void TestStableArena_New()
 	{
 		rr::StableArena arena{ 1024 * 1024 };
@@ -214,7 +194,6 @@ namespace rr::test
 		OutputDebugStringA("=== StableArena Tests ===\n");
 		TestStableArena_BasicAllocate();
 		TestStableArena_Alignment();
-		TestStableArena_AllocateTyped();
 		TestStableArena_New();
 		TestStableArena_NewArray();
 		TestStableArena_Rollback();

@@ -1,57 +1,33 @@
 #pragma once
+#include "Asserts.h"
 #include <atomic>
-#include <cstdint>
-#include <cstddef>
-#include <limits>
-#include <memory>
-#include <utility>
+#include <type_traits>
 
 namespace rr
 {
 	class JobSystem;
-	using JobID = uint16_t;
-	using JobFn = void(*)(JobSystem& sys, JobID self, void* data);
+	struct Job;
+	using JobFn = void(*)(Job* self, void* data);
+	using JobFnPlain = void(*)(Job* self);
+	using JobFnPlainNoSelf = void(*)();
 
-	constexpr JobID JobID_Null = std::numeric_limits<JobID>::max();
-	struct alignas(64) Job
+	struct Job
 	{
-		static constexpr size_t kDataSize = 96;
-		static constexpr size_t kDataAlign = 64;
-
-		std::byte data[kDataSize] = {};
-
-		std::atomic_int32_t unfinished_jobs{ 0 };
-		JobID parent = JobID_Null;
-		JobID continuation = JobID_Null;
+		JobSystem* system = nullptr;
+		Job* parent = nullptr;
+		Job* continuation = nullptr;
+		void* data = nullptr;
 
 		JobFn execute_fn = nullptr;
-		void (*destroy_fn)(void*) = nullptr;
+
+		std::atomic_int32_t unfinished_jobs{ 1 };
+
+		void Execute()
+		{
+			RR_ASSERT(execute_fn != nullptr);
+			execute_fn(this, data);
+		}
 	};
-	static_assert(alignof(Job) == 64);
-	static_assert(sizeof(Job) == 128);
 
-
-	//template<typename T>
-	//using TypedJobFn = void(*)(JobSystem& sys, JobID self, T& data);
-
-	//template<typename T, TypedJobFn<T> Fn>
-	//void JobTrampoline(JobSystem& sys, JobID self, void* data)
-	//{
-	//	Fn(sys, self, *static_cast<T*>(data));
-	//}
-
-	//template<typename T, TypedJobFn<T> Fn, typename ...Args>
-	//void SetJobPayload(Job* job, Args&& ...args)
-	//{
-	//	static_assert(sizeof(T) <= Job::kDataSize);
-	//	static_assert(alignof(T) <= alignof(Job));
-	//	job->execute_fn = &JobTrampoline<T, Fn>;
-	//	job->destroy_fn =
-	//		[](void* data)
-	//		{
-	//			std::destroy_at(static_cast<T*>(data));
-	//		};
-
-	//	::new (job->data) T(std::forward<Args>(args)...);
-	//}
+	static_assert(std::is_trivially_destructible_v<Job>);
 }

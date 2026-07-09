@@ -149,7 +149,6 @@
     <ClCompile Include="GPUBumpHeap.cpp" />
     <ClCompile Include="GPUDevice.cpp" />
     <ClCompile Include="GPURegistry.cpp" />
-    <ClCompile Include="JobPool.cpp" />
     <ClCompile Include="JobSystem.cpp" />
     <ClCompile Include="ModelLoadPipeline.cpp" />
     <ClCompile Include="PCH\pch.cpp">
@@ -169,7 +168,6 @@
     <ClInclude Include="GPURegistry.h" />
     <ClInclude Include="FileBatch.h" />
     <ClInclude Include="Job.h" />
-    <ClInclude Include="JobPool.h" />
     <ClInclude Include="JobSystem.h" />
     <ClInclude Include="ModelLoadPipeline.h" />
     <ClInclude Include="PCH\pch.h" />

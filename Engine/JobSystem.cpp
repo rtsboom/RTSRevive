@@ -9,6 +9,7 @@
 #include <atomic>
 #include <bit>
 #include <vector>
+#include "Asserts.h"
 
 static uint64_t XorShift64(uint64_t& state)
 {
@@ -99,64 +100,66 @@ namespace rr
 		}
 	}
 
-	void JobSystem::SetContinuation(JobID before, JobID after) const noexcept
+	void JobSystem::SetContinuation(Job* before, Job* after) const noexcept
 	{
-		Job* job = GetJobFromID(before);
-		assert(job);
-		assert(job->continuation == JobID_Null); // only one continuation allowed
+		// only one continuation allowed
+		RR_ASSERT(before != nullptr && before->continuation == nullptr);
 
-		job->continuation = after;
+		before->continuation = after;
 	}
 
-	uint64_t JobSystem::GetTotalExecutedJobs() const noexcept
+	uint64_t JobSystem::GetCurrentCreatedJobs() const noexcept
 	{
 		uint64_t total = 0;
 		for (auto const& worker : workers_)
 		{
-			total += worker.executed_jobs;
+			total += worker.created_jobs;
 		}
 		return total;
 	}
 
-	uint64_t JobSystem::GetTotalPushedJobs() const noexcept
+	uint64_t JobSystem::GetCurrentSubmittedJobs() const noexcept
 	{
 		uint64_t total = 0;
 		for (auto const& worker : workers_)
 		{
-			total += worker.pushed_jobs;
+			total += worker.submitted_jobs;
 		}
 		return total;
 	}
 
 	uint64_t JobSystem::GetCurrentExecutedJobs() const noexcept
 	{
-		uint64_t total = GetTotalExecutedJobs();
-		uint64_t const current_total = total - prev_total_executed_jobs_;
-		return current_total;
-	}
-
-	uint64_t JobSystem::GetCurrentPushedJobs() const noexcept
-	{
-		uint64_t total = GetTotalPushedJobs();
-		uint64_t const current_total = total - prev_total_pushed_jobs_;
-		return current_total;
-	}
-
-	bool JobSystem::PushJob(JobID id)
-	{
-		if (tls_self_->queue.Push(id))
+		uint64_t total = 0;
+		for (auto const& worker : workers_)
 		{
-			++tls_self_->pushed_jobs;
-			return true;
+			total += worker.executed_jobs;
 		}
 
-		return false;
+		return total;
 	}
 
-	bool JobSystem::AcquireJob(JobID& out)
+	uint64_t JobSystem::GetCurrentFinishedJobs() const noexcept
 	{
+		uint64_t total = 0;
+		for (auto const& worker : workers_)
+		{
+			total += worker.finished_jobs;
+		}
+		return total;
+	}
+
+
+	bool JobSystem::PushJob(Job* job)
+	{
+		return tls_self_->queue.Push(job);
+	}
+
+	Job* JobSystem::AcquireJob()
+	{
+		Job* out{ nullptr };
 		if (tls_self_->queue.Pop(out))
-			return true;
+			return out;
 
 		uint64_t const random = XorShift64(tls_self_->rng_state);
 
@@ -168,66 +171,71 @@ namespace rr
 				continue;
 
 			if (workers_[victim].queue.Steal(out))
-				return true;
+				return out;
 		}
 
-		return false;
+		return nullptr;
 	}
 
 	bool JobSystem::ProcessOneJob()
 	{
-		JobID id;
-		if (AcquireJob(id))
+		Job* job = AcquireJob();
+		if (job != nullptr)
 		{
-			ExecuteJob(id);
+			ExecuteJob(job);
 			return true;
 		}
 
 		return false;
 	}
 
-	void JobSystem::ExecuteJob(JobID id)
+	void JobSystem::ExecuteJob(Job* job)
 	{
-		Job* job = GetJobFromID(id);
-		assert(job);
-		(job->execute_fn)(*this, id, job->data);
-		
-		// for stats
+		RR_ASSERT(job->system == this);
+
 		++tls_self_->executed_jobs;
+		job->Execute();
 
 		// IMPORTANT:
 		// FinishJob() must be the last step of job execution.
 		// WaitJob() may return immediately after Finish() completes the root job, so
 		// no observable side effects should occur after this call.
-		FinishJob(id);
 
+		FinishJob(job);
 	}
 
-	void JobSystem::FinishJob(JobID id)
+	void JobSystem::FinishJob(Job* job)
 	{
-		Job* job = GetJobFromID(id);
-		assert(job);
+		RR_ASSERT(job != nullptr);
 
-		int32_t const unfinished = job->unfinished_jobs.fetch_sub(1, std::memory_order_acq_rel) - 1;
-		assert(unfinished >= 0);
+
+		int32_t const unfinished =
+			job->unfinished_jobs.fetch_sub(1, std::memory_order_acq_rel) - 1;
+
+		RR_ASSERT(unfinished >= 0);
 
 		if (unfinished == 0)
 		{
-			job->destroy_fn(job->data);
+			Job* const continuation = job->continuation;
+			Job* const parent = job->parent;
 
-			if (job->parent != JobID_Null)
+			if (continuation != nullptr)
+				RunJob(job->continuation);
+
+			if (parent != nullptr)
 				FinishJob(job->parent);
 
-			if (job->continuation != JobID_Null)
-				RunJob(job->continuation);
+			++tls_self_->finished_jobs;
 		}
 	}
 
 
-	void JobSystem::RunJob(JobID id)
+	void JobSystem::RunJob(Job* job)
 	{
-		assert(id != JobID_Null);
-		while (!PushJob(id)) // if queue is full
+		RR_ASSERT(job != nullptr);
+		++tls_self_->submitted_jobs;
+
+		while (!PushJob(job)) // if queue is full
 		{
 			ProcessOneJob();
 		}
@@ -235,41 +243,61 @@ namespace rr
 		WakeOneWorker();
 	}
 
-	void JobSystem::WaitJob(JobID id)
+	void JobSystem::WaitJob(Job* job)
 	{
-		assert(id != JobID_Null);
-		Job* job = GetJobFromID(id);
+		RR_CHECK(job != nullptr);
 
-		while (!IsComplete(job))
+		while (!IsFinished(job))
 		{
 			ProcessOneJob();
 		}
 	}
 
-	void JobSystem::FrameReset()
+	void JobSystem::Reset()
 	{
-		job_pool_.Reset();
-		prev_total_executed_jobs_ = GetTotalExecutedJobs();
-		prev_total_pushed_jobs_ = GetTotalPushedJobs();
+		auto const created_jobs = GetCurrentCreatedJobs();
+		auto const submitted_jobs = GetCurrentSubmittedJobs();
+		auto const executed_jobs = GetCurrentExecutedJobs();
+		auto const finished_jobs = GetCurrentFinishedJobs();
+
+		RR_CHECK(created_jobs == submitted_jobs);
+		RR_CHECK(submitted_jobs == executed_jobs);
+
+		// finished_jobs is a debug-only statistic.
+		// WaitJob() returns when Job::unfinished_jobs reaches zero, before finished_jobs is updated.
+		// Do not use finished_jobs for Reset() consistency checks.
+
+		for (auto& worker : workers_)
+		{
+			worker.arena.Rewind();
+			worker.created_jobs = 0;
+			worker.submitted_jobs = 0;
+			worker.executed_jobs = 0;
+			worker.finished_jobs = 0;
+		}
+
+		total_created_jobs_ += created_jobs;
+		total_submitted_jobs_ += submitted_jobs;
+		total_executed_jobs_ += executed_jobs;
+		total_finished_jobs_ += finished_jobs;
 	}
 
-	JobID JobSystem::AllocateJob()
+	Job* JobSystem::AllocateJob()
 	{
-		JobID id = job_pool_.Allocate(tls_self_->frame_job_cursor);
-		assert(id != JobID_Null && "The job pool is exhausted.");
+		constexpr size_t cache_line_size = 64;
+		void* const ptr = tls_self_->arena.Allocate(sizeof(Job), cache_line_size);
+		RR_CHECK(ptr != nullptr);
 
-		return id;
+		Job* const job = static_cast<Job*>(ptr);
+		std::construct_at(job);
+
+		++tls_self_->created_jobs;
+		return job;
 	}
 
-	Job* JobSystem::GetJobFromID(JobID id) const noexcept
+	bool JobSystem::IsFinished(Job* job) const noexcept
 	{
-		assert(id != JobID_Null);
-		return job_pool_.GetJob(id);
-	}
-
-	bool JobSystem::IsComplete(Job* job) const noexcept
-	{
-		assert(job);
+		RR_ASSERT(job);
 		return job->unfinished_jobs.load(std::memory_order_acquire) == 0;
 	}
 
@@ -294,6 +322,11 @@ namespace rr
 				return;
 			}
 		}
+	}
+
+	void JobSystem::CheckMainThreadOnly() const noexcept
+	{
+		RR_ASSERT(tls_self_ == &workers_.back());
 	}
 
 }

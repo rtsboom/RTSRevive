@@ -36,18 +36,30 @@ namespace rr
 		void Decommit();
 		void* Allocate(size_t size, size_t alignment = alignof(std::max_align_t));
 
+	public:
+		// Separate overload without Args... to avoid IntelliSense false errors.
 		template<typename T>
-		T* Allocate(size_t count = 1)
+		T* New()
 		{
-			static_assert(std::is_trivially_destructible_v<T>);
+			static_assert(std::is_default_constructible_v<T>,
+				"T is not default constructible.");
 
-			return static_cast<T*>(Allocate(sizeof(T) * count, alignof(T)));
+			T* ptr = static_cast<T*>(Allocate(sizeof(T), alignof(T)));
+			if (ptr)
+			{
+				std::construct_at(ptr);
+			}
+
+			return ptr;
 		}
 
 		template<typename T, typename ...Args>
 		T* New(Args&& ...args)
 		{
-			T* ptr = Allocate<T>();
+			static_assert(std::is_constructible_v<T, Args...>,
+				"T is not constructible from the provided arguments.");
+
+			T* ptr = static_cast<T*>(Allocate(sizeof(T), alignof(T)));
 			if (ptr)
 			{
 				std::construct_at(ptr, std::forward<Args>(args)...);
@@ -61,7 +73,7 @@ namespace rr
 		{
 			static_assert(std::is_default_constructible_v<T>);
 
-			T* ptr = Allocate<T>(count);
+			T* ptr = static_cast<T*>(Allocate(sizeof(T) * count, alignof(T)));
 			if (ptr)
 			{
 				for (size_t i{}; i < count; ++i)

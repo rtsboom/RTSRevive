@@ -3,8 +3,9 @@
 #include <cstdint>
 
 #include "Job.h"
-#include "JobPool.h"
 #include "WorkStealingQueue.h"
+#include "StableArena.h"
+#include "Asserts.h"
 #include <utility>
 #include <thread>
 #include <semaphore>
@@ -16,16 +17,19 @@ namespace rr
 {
 	class JobSystem
 	{
+		static constexpr size_t kWorkerArenaSize = 4 * 1024 * 1024; // 4MB
 		struct alignas(64) Worker
 		{
-			WorkStealingQueue<JobID, 1024> queue;
-			FrameJobCursor frame_job_cursor;
+			StableArena arena{ kWorkerArenaSize };
+			WorkStealingQueue<Job*, 1024> queue;
 			size_t id{ 0 };
 			uint64_t rng_state{ 0 };
 
 			//for stats
+			uint64_t created_jobs{ 0 };
+			uint64_t submitted_jobs{ 0 };
 			uint64_t executed_jobs{ 0 };
-			uint64_t pushed_jobs{ 0 };
+			uint64_t finished_jobs{ 0 };
 
 			// background thread, not used in main worker
 			std::thread thread;
@@ -43,165 +47,192 @@ namespace rr
 		JobSystem() = default;
 		~JobSystem();
 
-		void WorkerThreadLoop(Worker* self);
 		void Initialize(size_t worker_count);
 		void Shutdown();
+		void WorkerThreadLoop(Worker* self);
 
-		void RunJob(JobID id);
-		void WaitJob(JobID id);
-		void FrameReset();
+		void RunJob(Job* job);
+		void WaitJob(Job* job);
+		void Reset();
 
-		template<auto Fn, typename ...Args>
-		JobID CreateJob(Args&& ...args);
-
-		template<auto Fn, typename ...Args>
-		JobID CreateJobAsChild(JobID parent, Args&& ...args);
-
-		//template<typename T, TypedJobFn<T> Fn, typename ...Args>
-		//JobID CreateJobAsChild(JobID parent, Args&&... args);
-
-		//template<typename T, TypedJobFn<T> Fn, typename ...Args>
-		//JobID CreateJob(Args&&... args);
-
-		void SetContinuation(JobID before, JobID after) const noexcept;
+		Job* AllocateJob();
+		void SetContinuation(Job* before, Job* after) const noexcept;
 
 		//for stats
-		uint64_t GetTotalExecutedJobs() const noexcept;
-		uint64_t GetTotalPushedJobs() const noexcept;
+		uint64_t GetCurrentCreatedJobs() const noexcept;
+		uint64_t GetCurrentSubmittedJobs() const noexcept;
 		uint64_t GetCurrentExecutedJobs() const noexcept;
-		uint64_t GetCurrentPushedJobs() const noexcept;
+		uint64_t GetCurrentFinishedJobs() const noexcept;
+
+		uint64_t GetTotalCreatedJobs() const noexcept { return total_created_jobs_; }
+		uint64_t GetTotalSubmittedJobs() const noexcept { return total_submitted_jobs_; }
+		uint64_t GetTotalExecutedJobs() const noexcept { return total_executed_jobs_; }
+		uint64_t GetTotalFinishedJobs() const noexcept { return total_finished_jobs_; }
 
 	private:
-		bool PushJob(JobID id);
-		bool AcquireJob(JobID& out);
+		bool PushJob(Job* job);
+		Job* AcquireJob();
 		bool ProcessOneJob();
-		void ExecuteJob(JobID id);
-		void FinishJob(JobID id);
+		void ExecuteJob(Job* job);
+		void FinishJob(Job* job);
 
-		JobID AllocateJob();
-		Job* GetJobFromID(JobID id) const noexcept;
-		bool IsComplete(Job* job) const noexcept;
+		bool IsFinished(Job* job) const noexcept;
 
 		void WakeOneWorker();
 		size_t GetTotalWorkerCount() const noexcept { return workers_.size(); }
 		size_t GetBackgroundWorkerCount() const noexcept { return workers_.size() - 1; }
+		void CheckMainThreadOnly() const noexcept;
 
 	private:
-		FrameJobPool job_pool_;
+		template<JobFnPlain Fn>
+		Job* CreatePlainJobImpl();
+
+		template<JobFnPlainNoSelf Fn>
+		Job* CreatePlainJobNoSelfImpl();
+
+		template<auto Fn, typename... Args>
+		Job* CreateJobImpl(Args&& ...args);
+
+		template<auto Fn, typename... Args>
+		Job* CreateJobNoSelfImpl(Args&& ...args);
+
+		template<auto Fn, typename ...Args>
+		Job* CreateJobRouter(Args&& ...args);
+
+	public:
+		template<auto Fn, typename ...Args>
+		Job* CreateJob(Args&& ...args);
+
+		template<auto Fn, typename ...Args>
+		Job* CreateJobAsChild(Job* parent, Args&& ...args);
+
+	private:
 		std::vector<Worker> workers_;
 
 		std::atomic_bool running_{ false };
 		std::atomic_uint64_t sleeping_worker_mask_{ 0 };
 
 		// for stats
-		uint64_t prev_total_pushed_jobs_{ 0 };
-		uint64_t prev_total_executed_jobs_{ 0 };
+		uint64_t total_created_jobs_{ 0 };
+		uint64_t total_submitted_jobs_{ 0 };
+		uint64_t total_executed_jobs_{ 0 };
+		uint64_t total_finished_jobs_{ 0 };
 	};
 
+	template<JobFnPlain Fn>
+	inline Job* JobSystem::CreatePlainJobImpl()
+	{
+		Job* const job = AllocateJob();
+		job->system = this;
+		job->execute_fn = [](Job* self, void*)
+			{
+				Fn(self);
+			};
 
+		return job;
+	}
+
+	template<JobFnPlainNoSelf Fn>
+	inline Job* JobSystem::CreatePlainJobNoSelfImpl()
+	{
+		Job* const job = AllocateJob();
+		job->system = this;
+		job->execute_fn = [](Job*, void*)
+			{
+				Fn();
+			};
+
+		return job;
+	}
 
 	template<auto Fn, typename ...Args>
-	inline JobID JobSystem::CreateJob(Args&& ...args)
+	inline Job* JobSystem::CreateJobImpl(Args&&... args)
 	{
-		bool constexpr job_sys_known =
-			std::is_invocable_v<decltype(Fn), JobSystem&, JobID, std::decay_t<Args>&...>;
-		static_assert(
-			job_sys_known ||
-			std::is_invocable_v<decltype(Fn), std::decay_t<Args>&...>,
+		static_assert(std::is_invocable_v<decltype(Fn), Job*, std::decay_t<Args>&...>,
 			"Job function arguments do not match the function signature.");
 
-		using Params = std::tuple<std::decay_t<Args>...>;
-		static_assert(sizeof(Params) <= Job::kDataSize);
-		static_assert(alignof(Params) <= Job::kDataAlign);
+		using Payload = std::tuple<std::decay_t<Args>...>;
+		static_assert(std::is_trivially_destructible_v<Payload>,
+			"Job payload must be trivially destructible. Pass owning objects by pointer.");
 
-		JobID current = AllocateJob();
-		Job* current_job = GetJobFromID(current);
-		current_job->unfinished_jobs.store(1, std::memory_order_relaxed);
 
-		current_job->parent = JobID_Null;
-		current_job->continuation = JobID_Null;
+		Job* const job = AllocateJob();
+		job->system = this;
 
-		new (current_job->data) Params(std::forward<Args>(args)...);
+		job->data = tls_self_->arena.New<Payload>(std::forward<Args>(args)...);
+		RR_CHECK(job->data != nullptr);
 
-		current_job->execute_fn = [](JobSystem& sys, JobID self, void* data)
+		job->execute_fn = [](Job* self, void* data)
 			{
-				auto& params = *static_cast<Params*>(data);
-				if constexpr (job_sys_known)
-				{
-					std::apply(
-						[&](auto& ...xs)
-						{
-							Fn(sys, self, xs...);
-						}, 
-						params
-					);
-				}
-				else
-				{
-					std::apply(
-						[](auto& ...xs)
-						{
-							Fn(xs...);
-						}, 
-						params
-					);
-				}
+				auto& payload = *static_cast<Payload*>(data);
+				std::apply([&](auto&... xs) { Fn(self, xs...); }, payload);
 			};
 
-		current_job->destroy_fn = [](void* data)
-			{
-				std::destroy_at(static_cast<Params*>(data));
-			};
-
-		return current;
-
+		return job;
 	}
 
 	template<auto Fn, typename ...Args>
-	inline JobID JobSystem::CreateJobAsChild(JobID parent, Args&& ...args)
+	inline Job* JobSystem::CreateJobNoSelfImpl(Args&&... args)
 	{
+		static_assert(std::is_invocable_v<decltype(Fn), std::decay_t<Args>&...>,
+			"Job function arguments do not match the function signature.");
 
+		using Payload = std::tuple<std::decay_t<Args>...>;
+		static_assert(std::is_trivially_destructible_v<Payload>,
+			"Job payload must be trivially destructible. Pass owning objects by pointer.");
 
-		Job* parent_job = GetJobFromID(parent);
-		parent_job->unfinished_jobs.fetch_add(1, std::memory_order_relaxed);
+		Job* const job = AllocateJob();
+		job->system = this;
 
-		JobID current = CreateJob<Fn>(std::forward<Args>(args)...);
-		Job* current_job = GetJobFromID(current);
-		current_job->parent = parent;
+		job->data = tls_self_->arena.New<Payload>(std::forward<Args>(args)...);
+		RR_CHECK(job->data != nullptr);
 
-		return current;
+		job->execute_fn = [](Job*, void* data)
+			{
+				RR_ASSERT(data != nullptr);
+				auto& payload = *static_cast<Payload*>(data);
+				std::apply([&](auto&... xs) { Fn(xs...); }, payload);
+			};
+
+		return job;
 	}
 
-	//template<typename T, TypedJobFn<T> Fn, typename ...Args>
-	//inline JobID JobSystem::CreateJobAsChild(JobID parent, Args&& ...args)
-	//{
-	//	JobID current = AllocateJob();
-	//	Job* current_job = GetJobFromID(current);
-	//	Job* parent_job = GetJobFromID(parent);
-	//	parent_job->unfinished_jobs.fetch_add(1, std::memory_order_relaxed);
+	template<auto Fn, typename ...Args>
+	inline Job* JobSystem::CreateJobRouter(Args&&... args)
+	{
+		if constexpr (sizeof...(Args) == 0)
+		{
+			if constexpr (std::is_invocable_v<decltype(Fn), Job*>)
+				return CreatePlainJobImpl<Fn>();
+			else
+				return CreatePlainJobNoSelfImpl<Fn>();
+		}
+		else
+		{
+			if constexpr (std::is_invocable_v<decltype(Fn), Job*, Args&...>)
+				return CreateJobImpl<Fn>(std::forward<Args>(args)...);
+			else
+				return CreateJobNoSelfImpl<Fn>(std::forward<Args>(args)...);
+		}
+	}
 
-	//	current_job->parent = parent;
-	//	current_job->continuation = JobID_Null;
-	//	SetJobPayload<T, Fn>(current_job, std::forward<Args>(args)...);
 
-	//	current_job->unfinished_jobs.store(1, std::memory_order_relaxed);
+	template<auto Fn, typename... Args>
+	inline Job* JobSystem::CreateJob(Args&&... args)
+	{
+		CheckMainThreadOnly();
+		return CreateJobRouter<Fn>(std::forward<Args>(args)...);
+	}
 
-	//	return current;
-	//}
+	template<auto Fn, typename ...Args>
+	inline Job* JobSystem::CreateJobAsChild(Job* parent, Args&&... args)
+	{
+		RR_ASSERT(parent);
+		parent->unfinished_jobs.fetch_add(1, std::memory_order_relaxed);
 
-	//template<typename T, TypedJobFn<T> Fn, typename ...Args>
-	//inline JobID JobSystem::CreateJob(Args&& ...args)
-	//{
-	//	JobID current = AllocateJob();
-	//	Job* current_job = GetJobFromID(current);
+		Job* job = CreateJobRouter<Fn>(std::forward<Args>(args)...);
+		job->parent = parent;
 
-	//	current_job->parent = JobID_Null;
-	//	current_job->continuation = JobID_Null;
-	//	SetJobPayload<T, Fn>(current_job, std::forward<Args>(args)...);
-
-	//	current_job->unfinished_jobs.store(1, std::memory_order_relaxed);
-
-	//	return current;
-	//}
-
+		return job;
+	}
 }

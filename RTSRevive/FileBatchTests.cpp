@@ -47,7 +47,7 @@ namespace
 	{
 		rr::FileBatch batch(1024 * 1024); // 1 MB capacity
 		std::filesystem::path test_file_path = "Assets/Models/kenney_cube_pets/animal-beaver.glb";
-		
+
 		RR_CHECK(batch.AddFile(test_file_path));
 		batch.Clear();
 		RR_CHECK(batch.GetUsedBytes() == 0);
@@ -70,14 +70,14 @@ namespace
 		size_t const capacity_bytes = 1024 * 1024;
 		rr::FileBatch batch(capacity_bytes);
 		std::filesystem::path test_file_path = "Assets/Models/kenney_cube_pets/animal-beaver.glb";
-		
+
 		bool result = true;
 		while (result)
 		{
 			result = batch.AddFile(test_file_path);
 		}
 		RR_CHECK(!result);
-		RR_CHECK(batch.GetUsedBytes() < batch.GetArenaMaxSize());		
+		RR_CHECK(batch.GetUsedBytes() < batch.GetArenaMaxSize());
 	}
 
 	void ParseWithTinyGLTFv3()
@@ -95,11 +95,12 @@ namespace
 			});
 	}
 
-	void FileBatchTestJob(JobSystem& sys, JobID self, FileBatch* batch)
+	void FileBatchTestJob(Job* self, FileBatch* batch)
 	{
 		batch->ForEach([&](FileBlob const& file_blob)
 			{
-				JobID child = sys.CreateJobAsChild<LoadGltfFromFileBlob>(self, file_blob);
+				JobSystem& sys = *self->system;
+				Job* child = sys.CreateJobAsChild<LoadGltfFromFileBlob>(self, file_blob);
 				sys.RunJob(child);
 			});
 	}
@@ -139,10 +140,10 @@ namespace
 
 		timer.Reset();
 
-		JobID root = job_system.CreateJob<FileBatchTestJob>(&batch);
+		Job* root = job_system.CreateJob<FileBatchTestJob>(&batch);
 		job_system.RunJob(root);
 		job_system.WaitJob(root);
-		job_system.FrameReset();
+		job_system.Reset();
 
 		RR_CHECK(job_system.GetTotalExecutedJobs() == count + 1);
 

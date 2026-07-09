@@ -19,9 +19,6 @@
     <ClCompile Include="JobSystem.cpp">
       <Filter>Job</Filter>
     </ClCompile>
-    <ClCompile Include="JobPool.cpp">
-      <Filter>Job</Filter>
-    </ClCompile>
     <ClCompile Include="Test\JobSystemTests.cpp">
       <Filter>Test</Filter>
     </ClCompile>
@@ -68,9 +65,6 @@
       <Filter>Job</Filter>
     </ClInclude>
     <ClInclude Include="WorkStealingQueue.h">
-      <Filter>Job</Filter>
-    </ClInclude>
-    <ClInclude Include="JobPool.h">
       <Filter>Job</Filter>
     </ClInclude>
     <ClInclude Include="SPMCQueue.h">

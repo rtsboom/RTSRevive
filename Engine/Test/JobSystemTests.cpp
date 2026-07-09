@@ -17,17 +17,18 @@ namespace
 		int depth{ 0 };
 	};
 
-	void FanOutJob(JobSystem& sys, JobID self, FanOutJobData& data)
+	void FanOutJob(Job* self, FanOutJobData& data)
 	{
+		JobSystem& sys = *self->system;
 		data.counter->fetch_add(1, std::memory_order_relaxed);
 		if (data.depth <= 0)
 			return;
 
-		JobID a = sys.CreateJobAsChild<FanOutJob>(self, FanOutJobData{ data.counter, data.depth - 1 });
-		JobID b = sys.CreateJobAsChild<FanOutJob>(self, FanOutJobData{ data.counter, data.depth - 1 });
+		Job* a = sys.CreateJobAsChild<FanOutJob>(self, FanOutJobData{ data.counter, data.depth - 1 });
+		Job* b = sys.CreateJobAsChild<FanOutJob>(self, FanOutJobData{ data.counter, data.depth - 1 });
 
-		assert(a != JobID_Null);
-		assert(b != JobID_Null);
+		RR_ASSERT(a != nullptr);
+		RR_ASSERT(b != nullptr);
 
 		sys.RunJob(a);
 		sys.RunJob(b);
@@ -38,14 +39,14 @@ namespace
 		JobSystem js;
 		js.Initialize(4);
 		std::atomic_int32_t counter{ 0 };
-		JobID job = js.CreateJob<CounterJob>(&counter);
+		Job* job = js.CreateJob<CounterJob>(&counter);
 
-		assert(job != JobID_Null);
+		RR_ASSERT(job != nullptr);
 
 		js.RunJob(job);
 		js.WaitJob(job);
 
-		assert(counter.load(std::memory_order_relaxed) == 1);
+		RR_ASSERT(counter.load(std::memory_order_relaxed) == 1);
 		js.Shutdown();
 	}
 
@@ -57,13 +58,13 @@ namespace
 		constexpr int job_count = 10'000;
 		std::atomic<int> counter = 0;
 
-		JobID root = js.CreateJob<CounterJob>(&counter);
-		assert(root != JobID_Null);
+		Job* root = js.CreateJob<CounterJob>(&counter);
+		RR_ASSERT(root != nullptr);
 
 		for (int i = 0; i < job_count; ++i)
 		{
-			JobID child = js.CreateJobAsChild<CounterJob>(root, &counter);
-			assert(child != JobID_Null);
+			Job* child = js.CreateJobAsChild<CounterJob>(root, &counter);
+			RR_ASSERT(child != nullptr);
 			js.RunJob(child);
 		}
 
@@ -71,7 +72,7 @@ namespace
 		js.WaitJob(root);
 
 		// Add 1 to the final count for the root job.
-		assert(counter.load(std::memory_order_relaxed) == job_count + 1);
+		RR_ASSERT(counter.load(std::memory_order_relaxed) == job_count + 1);
 
 		js.Shutdown();
 	}
@@ -86,13 +87,13 @@ namespace
 		constexpr int depth = 10;
 		constexpr int expected = (1 << (depth + 1)) - 1;
 
-		JobID root = js.CreateJob<FanOutJob>(FanOutJobData{ &counter, depth });
-		assert(root != JobID_Null);
+		Job* root = js.CreateJob<FanOutJob>(FanOutJobData{ &counter, depth });
+		RR_ASSERT(root != nullptr);
 
 		js.RunJob(root);
 		js.WaitJob(root);
 
-		assert(counter.load(std::memory_order_relaxed) == expected);
+		RR_ASSERT(counter.load(std::memory_order_relaxed) == expected);
 
 		js.Shutdown();
 	}
@@ -107,16 +108,16 @@ namespace
 			constexpr int job_count = 30'000; // Max 2^15
 			std::atomic<int> counter = 0;
 
-			JobID root = js.CreateJob<CounterJob>(&counter);
+			Job* root = js.CreateJob<CounterJob>(&counter);
 
 
-			assert(root != JobID_Null);
+			RR_ASSERT(root != nullptr);
 
 			for (int i = 0; i < job_count; ++i)
 			{
-				JobID child = js.CreateJobAsChild<CounterJob>(root, &counter);
+				Job* child = js.CreateJobAsChild<CounterJob>(root, &counter);
 
-				assert(child != JobID_Null);
+				RR_ASSERT(child != nullptr);
 				js.RunJob(child);
 			}
 
@@ -138,30 +139,30 @@ namespace
 		constexpr int frame_count{ 1000 };
 		for (int frame = 0; frame < frame_count; ++frame)
 		{
-
-			js.FrameReset();
 			std::atomic<int> counter{ 0 };
 
-			JobID root = js.CreateJob<CounterJob>(&counter);
+			Job* root = js.CreateJob<CounterJob>(&counter);
 
-			assert(root != JobID_Null);
+			RR_ASSERT(root != nullptr);
 
 			for (int i = 0; i < job_count; ++i)
 			{
-				JobID child = js.CreateJobAsChild<CounterJob>(root, &counter);
+				Job* child = js.CreateJobAsChild<CounterJob>(root, &counter);
 
-				assert(child != JobID_Null);
+				RR_ASSERT(child != nullptr);
 				js.RunJob(child);
 			}
 
 			js.RunJob(root);
 			js.WaitJob(root);
 
-			assert(counter.load(std::memory_order_relaxed) == job_count + 1);
+			RR_ASSERT(counter.load(std::memory_order_relaxed) == job_count + 1);
+			js.Reset();
 		}
 
-		assert(js.GetTotalExecutedJobs() == (job_count + 1) * frame_count);
-		assert(js.GetTotalPushedJobs() == (job_count + 1) * frame_count);
+		constexpr size_t total_expected = (job_count + 1) * frame_count;
+		RR_ASSERT(js.GetTotalExecutedJobs() == total_expected);
+		RR_ASSERT(js.GetTotalSubmittedJobs() == total_expected);
 		js.Shutdown();
 	}
 
@@ -181,7 +182,7 @@ namespace
 		js.RunJob(a);
 		js.WaitJob(b);
 
-		assert(counter == 2);
+		RR_ASSERT(counter == 2);
 
 		js.Shutdown();
 	}
@@ -206,7 +207,8 @@ namespace
 
 		js.RunJob(root);
 		js.WaitJob(prev); // last one
-		assert(counter == continuation_count + 1);
+
+		RR_ASSERT(counter == continuation_count + 1);
 		js.Shutdown();
 	}
 }

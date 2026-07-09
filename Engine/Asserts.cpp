@@ -1,7 +1,5 @@
 #include "pch.h"
 #include "Asserts.h"
-#include <Windows.h>
-#include <cstdio>
 #include <cstdint>
 #include <source_location>
 #include <string_view>

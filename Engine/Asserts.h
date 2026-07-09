@@ -59,9 +59,17 @@ namespace rr
 		OutputDebugStringA(buffer);
 	}
 
-	void AssertFailure(std::string_view expr, std::string_view msg = {}, std::source_location loc = std::source_location::current());
-	void CheckFailure(std::string_view expr, std::string_view msg = {}, std::source_location loc = std::source_location::current());
-	void CheckFailure(std::string_view expr, uint32_t code, std::string_view msg = {}, std::source_location loc = std::source_location::current());
+	[[noreturn]]
+	void AssertFailure(std::string_view expr, std::string_view msg = {},
+		std::source_location loc = std::source_location::current());
+
+	[[noreturn]]
+	void CheckFailure(std::string_view expr, std::string_view msg = {},
+		std::source_location loc = std::source_location::current());
+
+	[[noreturn]]
+	void CheckFailure(std::string_view expr, uint32_t code, std::string_view msg = {},
+		std::source_location loc = std::source_location::current());
 }
 
 #define RR_CHECK(expr) do { if (!(expr)) CheckFailure(#expr); } while(false)
