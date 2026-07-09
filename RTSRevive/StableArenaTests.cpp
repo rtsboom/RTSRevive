@@ -191,7 +191,7 @@ namespace rr::test
 {
 	void TestStableArena()
 	{
-		OutputDebugStringA("=== StableArena Tests ===\n");
+		LogOutput(LogLevel::Info, "=== StableArena Tests ===");
 		TestStableArena_BasicAllocate();
 		TestStableArena_Alignment();
 		TestStableArena_New();
@@ -201,6 +201,6 @@ namespace rr::test
 		TestStableArena_Decommit();
 		TestStableArena_MoveConstructor();
 		TestStableArena_MoveAssignment();
-		OutputDebugStringA("=== StableArena Done ===\n");
+		LogOutput(LogLevel::Info, "=== StableArena Done ===");
 	}
 }

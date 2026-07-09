@@ -181,7 +181,7 @@ namespace rr::test
 {
 	void TestStableArray()
 	{
-		OutputDebugStringA("=== StableArray Tests ===\n");
+		LogOutput(LogLevel::Info, "=== StableArray Tests ===");
 		TestStableArray_PushPopBasic();
 		TestStableArray_DestructorCounts();
 		TestStableArray_ResizeDefault();
@@ -190,6 +190,6 @@ namespace rr::test
 		TestStableArray_MoveSemantics();
 		TestStableArray_EmplaceMoveOnly();
 		TestStableArray_ConstCorrectness();
-		OutputDebugStringA("=== StableArray Done ===\n");
+		LogOutput(LogLevel::Info, "=== StableArray Done ===");
 	}
 }

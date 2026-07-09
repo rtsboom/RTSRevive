@@ -107,8 +107,6 @@ namespace
 
 	void PlayWithJobSystem()
 	{
-		char debug_msg[256];
-
 		Timer timer;
 
 		JobSystem job_system;
@@ -135,8 +133,7 @@ namespace
 		}
 
 		double file_read_ms = timer.ElapsedMilliseconds();
-		std::snprintf(debug_msg, sizeof(debug_msg), "FileBatch read %zu files in %.3f ms\n", count, file_read_ms);
-		OutputDebugStringA(debug_msg);
+		LogOutput(LogLevel::Info, "FileBatch read {} files in {} ms", count, file_read_ms);
 
 		timer.Reset();
 
@@ -149,9 +146,8 @@ namespace
 
 
 		double parse_ms = timer.ElapsedMilliseconds();
-		std::snprintf(debug_msg, sizeof(debug_msg), "FileBatch parsed %zu files in %.3f ms\n", count, parse_ms);
-		OutputDebugStringA(debug_msg);
 
+		LogOutput(LogLevel::Info, "FileBatch parsed {} files in {} ms", count, parse_ms);
 		job_system.Shutdown();
 	}
 }
