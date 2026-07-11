@@ -6,7 +6,7 @@ namespace
 {
 	using namespace rr;
 
-	void CounterJob(std::atomic_int32_t* counter)
+	void CounterJob(Job*, std::atomic_int32_t* counter)
 	{
 		counter->fetch_add(1, std::memory_order_relaxed);
 	}
@@ -19,19 +19,18 @@ namespace
 
 	void FanOutJob(Job* self, FanOutJobData& data)
 	{
-		JobSystem& sys = *self->system;
 		data.counter->fetch_add(1, std::memory_order_relaxed);
 		if (data.depth <= 0)
 			return;
 
-		Job* a = sys.CreateJobAsChild<FanOutJob>(self, FanOutJobData{ data.counter, data.depth - 1 });
-		Job* b = sys.CreateJobAsChild<FanOutJob>(self, FanOutJobData{ data.counter, data.depth - 1 });
+		Job* a = self->CreateChild<FanOutJob>(FanOutJobData{ data.counter, data.depth - 1 });
+		Job* b = self->CreateChild<FanOutJob>(FanOutJobData{ data.counter, data.depth - 1 });
 
 		RR_ASSERT(a != nullptr);
 		RR_ASSERT(b != nullptr);
 
-		sys.RunJob(a);
-		sys.RunJob(b);
+		self->Run(a);
+		self->Run(b);
 	}
 
 	void BasicExecute()
@@ -176,8 +175,7 @@ namespace
 		auto a = js.CreateJob<CounterJob>(&counter);
 		auto b = js.CreateJob<CounterJob>(&counter);
 
-
-		js.SetContinuation(a, b);
+		a->SetNext(b);
 
 		js.RunJob(a);
 		js.WaitJob(b);
@@ -201,7 +199,7 @@ namespace
 		for (int i{}; i < continuation_count; ++i)
 		{
 			auto next = js.CreateJob<CounterJob>(&counter);
-			js.SetContinuation(prev, next);
+			prev->SetNext(next);
 			prev = next;
 		}
 

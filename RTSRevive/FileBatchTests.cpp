@@ -95,13 +95,18 @@ namespace
 			});
 	}
 
-	void FileBatchTestJob(Job* self, FileBatch* batch)
+	void FileBatchTestJob(Job* ctx, FileBatch* batch)
 	{
+		constexpr auto load_gltf_job =
+			[](Job* self, FileBlob const& file_blob)
+			{
+				LoadGltfFromFileBlob(file_blob);
+			};
+
 		batch->ForEach([&](FileBlob const& file_blob)
 			{
-				JobSystem& sys = *self->system;
-				Job* child = sys.CreateJobAsChild<LoadGltfFromFileBlob>(self, file_blob);
-				sys.RunJob(child);
+				Job* child = ctx->CreateChild<load_gltf_job>(file_blob);
+				ctx->Run(child);
 			});
 	}
 

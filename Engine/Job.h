@@ -1,32 +1,43 @@
 #pragma once
 #include "Asserts.h"
+#include "StableArena.h"
 #include <atomic>
 #include <type_traits>
 
 namespace rr
 {
 	class JobSystem;
-	struct Job;
-	using JobFn = void(*)(Job* self, void* data);
-	using JobFnPlain = void(*)(Job* self);
-	using JobFnPlainNoSelf = void(*)();
+	class Job;
+	using JobFn = void(*)(Job* ctx, void* payload);
+	using JobFnNoPayload = void(*)(Job* ctx);
 
-	struct Job
+	class Job
 	{
-		JobSystem* system = nullptr;
+		friend JobSystem;
+	private:
+		JobSystem* system_ = nullptr;
 		Job* parent = nullptr;
-		Job* continuation = nullptr;
-		void* data = nullptr;
+		Job* next_ = nullptr;
 
-		JobFn execute_fn = nullptr;
+		JobFn execute_ = nullptr;
+		void* payload_ = nullptr;
 
-		std::atomic_int32_t unfinished_jobs{ 1 };
+		std::atomic_int32_t unfinished_{ 1 };
 
+	private:
 		void Execute()
 		{
-			RR_ASSERT(execute_fn != nullptr);
-			execute_fn(this, data);
+			RR_ASSERT(execute_ != nullptr);
+			execute_(this, payload_);
 		}
+
+	public:
+		template <auto Fn, typename... Args>
+		Job* CreateChild(Args... args);
+
+		void Run(Job* job);
+		void SetNext(Job* job);
+		StableArena& GetScratchArena();
 	};
 
 	static_assert(std::is_trivially_destructible_v<Job>);

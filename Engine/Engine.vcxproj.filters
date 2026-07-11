@@ -43,6 +43,9 @@
     <ClCompile Include="Asserts.cpp">
       <Filter>Core</Filter>
     </ClCompile>
+    <ClCompile Include="Job.cpp">
+      <Filter>Job</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SimpleEvent.h" />

@@ -100,14 +100,6 @@ namespace rr
 		}
 	}
 
-	void JobSystem::SetContinuation(Job* before, Job* after) const noexcept
-	{
-		// only one continuation allowed
-		RR_ASSERT(before != nullptr && before->continuation == nullptr);
-
-		before->continuation = after;
-	}
-
 	uint64_t JobSystem::GetCurrentCreatedJobs() const noexcept
 	{
 		uint64_t total = 0;
@@ -149,10 +141,17 @@ namespace rr
 		return total;
 	}
 
-
-	bool JobSystem::PushJob(Job* job)
+	Job* JobSystem::AllocateJob()
 	{
-		return tls_self_->queue.Push(job);
+		constexpr size_t cache_line_size = 64;
+		void* const ptr = tls_self_->arena.Allocate(sizeof(Job), cache_line_size);
+		RR_CHECK(ptr != nullptr);
+
+		Job* const job = static_cast<Job*>(ptr);
+		std::construct_at(job);
+
+		++tls_self_->created_jobs;
+		return job;
 	}
 
 	Job* JobSystem::AcquireJob()
@@ -177,6 +176,12 @@ namespace rr
 		return nullptr;
 	}
 
+
+	bool JobSystem::PushJob(Job* job)
+	{
+		return tls_self_->queue.Push(job);
+	}
+
 	bool JobSystem::ProcessOneJob()
 	{
 		Job* job = AcquireJob();
@@ -191,9 +196,11 @@ namespace rr
 
 	void JobSystem::ExecuteJob(Job* job)
 	{
-		RR_ASSERT(job->system == this);
+		RR_ASSERT(job->system_ == this);
 
 		++tls_self_->executed_jobs;
+
+		GetScratchArena().Rewind();
 		job->Execute();
 
 		// IMPORTANT:
@@ -210,17 +217,17 @@ namespace rr
 
 
 		int32_t const unfinished =
-			job->unfinished_jobs.fetch_sub(1, std::memory_order_acq_rel) - 1;
+			job->unfinished_.fetch_sub(1, std::memory_order_acq_rel) - 1;
 
 		RR_ASSERT(unfinished >= 0);
 
 		if (unfinished == 0)
 		{
-			Job* const continuation = job->continuation;
+			Job* const next_ = job->next_;
 			Job* const parent = job->parent;
 
-			if (continuation != nullptr)
-				RunJob(job->continuation);
+			if (next_ != nullptr)
+				RunJob(job->next_);
 
 			if (parent != nullptr)
 				FinishJob(job->parent);
@@ -253,6 +260,12 @@ namespace rr
 		}
 	}
 
+	bool JobSystem::IsFinished(Job* job) const noexcept
+	{
+		RR_ASSERT(job);
+		return job->unfinished_.load(std::memory_order_acquire) == 0;
+	}
+
 	void JobSystem::Reset()
 	{
 		auto const created_jobs = GetCurrentCreatedJobs();
@@ -264,7 +277,7 @@ namespace rr
 		RR_CHECK(submitted_jobs == executed_jobs);
 
 		// finished_jobs is a debug-only statistic.
-		// WaitJob() returns when Job::unfinished_jobs reaches zero, before finished_jobs is updated.
+		// WaitJob() returns when Job::unfinished_ reaches zero, before finished_jobs is updated.
 		// Do not use finished_jobs for Reset() consistency checks.
 
 		for (auto& worker : workers_)
@@ -280,25 +293,6 @@ namespace rr
 		total_submitted_jobs_ += submitted_jobs;
 		total_executed_jobs_ += executed_jobs;
 		total_finished_jobs_ += finished_jobs;
-	}
-
-	Job* JobSystem::AllocateJob()
-	{
-		constexpr size_t cache_line_size = 64;
-		void* const ptr = tls_self_->arena.Allocate(sizeof(Job), cache_line_size);
-		RR_CHECK(ptr != nullptr);
-
-		Job* const job = static_cast<Job*>(ptr);
-		std::construct_at(job);
-
-		++tls_self_->created_jobs;
-		return job;
-	}
-
-	bool JobSystem::IsFinished(Job* job) const noexcept
-	{
-		RR_ASSERT(job);
-		return job->unfinished_jobs.load(std::memory_order_acquire) == 0;
 	}
 
 	void JobSystem::WakeOneWorker()

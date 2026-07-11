@@ -149,6 +149,7 @@
     <ClCompile Include="GPUBumpHeap.cpp" />
     <ClCompile Include="GPUDevice.cpp" />
     <ClCompile Include="GPURegistry.cpp" />
+    <ClCompile Include="Job.cpp" />
     <ClCompile Include="JobSystem.cpp" />
     <ClCompile Include="ModelLoadPipeline.cpp" />
     <ClCompile Include="PCH\pch.cpp">
