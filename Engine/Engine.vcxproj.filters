@@ -97,6 +97,9 @@
     <ClInclude Include="Timer.h">
       <Filter>Core</Filter>
     </ClInclude>
+    <ClInclude Include="ModelAsset.h">
+      <Filter>Asset</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="GPU">
@@ -119,6 +122,9 @@
     </Filter>
     <Filter Include="PCH">
       <UniqueIdentifier>{041cda9c-4229-499b-b5a2-b9b2f7554058}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset">
+      <UniqueIdentifier>{ebe47891-958b-4591-b342-475cfbaa18bf}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

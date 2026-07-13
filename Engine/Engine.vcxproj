@@ -162,6 +162,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Asserts.h" />
+    <ClInclude Include="ModelAsset.h" />
     <ClInclude Include="StableArray.h" />
     <ClInclude Include="GPUBumpBuffer.h" />
     <ClInclude Include="GPUBumpHeap.h" />

@@ -17,7 +17,6 @@ namespace
 		{
 			base_dir = file_blob.path.substr(0, pos);
 		}
-		base_dir = {};
 
 		tg3_model model;
 		tg3_parse_options opts;
