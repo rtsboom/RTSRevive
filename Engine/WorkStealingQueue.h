@@ -25,7 +25,10 @@ namespace rr
 		bool Push(T value)
 		{
 			uint64_t const b = bottom_.load(std::memory_order_relaxed);
-			uint64_t const t = top_.load(std::memory_order_acquire);
+
+			// Must be acquire to syncronize-with the successful top CAS in Steal().
+			// Ensures the thief has completed reading the slot before it is reused.
+			uint64_t const t = top_.load(std::memory_order_acquire); 
 
 			uint64_t const size = b - t;
 			if (size >= capacity_) return false; // full
@@ -59,7 +62,7 @@ namespace rr
 			uint64_t const index = (b - 1) & capacity_mask_;
 			T value = slots_[index].load(std::memory_order_relaxed);
 
-			if (size == 1) // last item, must contend with stealers
+			if (size == 1) // last item, must contend with thieves
 			{
 				bool result{ false };
 				if (top_.compare_exchange_strong(
@@ -108,7 +111,7 @@ namespace rr
 		}
 
 	private:
-		alignas(64) std::atomic_uint64_t top_{ 0 }; // steal side
+		alignas(64) std::atomic_uint64_t top_{ 0 }; // thief side
 		alignas(64) std::atomic_uint64_t bottom_{ 0 }; // owner side
 		alignas(64) std::unique_ptr<std::atomic<T>[]> slots_;
 	};
