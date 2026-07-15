@@ -12,6 +12,7 @@
 #include <vector>
 #include <tuple>
 #include <type_traits>
+#include <functional>
 namespace rr
 {
 	class JobSystem
@@ -23,7 +24,6 @@ namespace rr
 			StableArena arena{ kWorkerArenaSize };
 			StableArena scratch{ kScratchArenaSize };
 			WorkStealingQueue<Job*, 1024> queue;
-			size_t id{ 0 };
 			uint64_t rng_state{ 0 };
 
 			//for stats
@@ -38,7 +38,8 @@ namespace rr
 		};
 		static_assert(alignof(Worker) == 64);
 
-		inline static thread_local Worker* tls_self_ = nullptr;
+		inline static thread_local size_t tls_worker_index{ 0 };
+		inline static thread_local JobSystem* tls_system{ nullptr };
 
 	public:
 		// Uses a 64-bit sleeping worker bitmask.
@@ -50,14 +51,14 @@ namespace rr
 
 		void Initialize(size_t worker_count);
 		void Shutdown();
-		void WorkerThreadLoop(Worker* self);
+		void WorkerThreadLoop(size_t index);
 
 		void RunJob(Job* job);
 		void WaitJob(Job* job);
 		bool IsFinished(Job* job) const noexcept;
 		void Reset();
 
-		StableArena& GetScratchArena() noexcept { return tls_self_->scratch; }
+		StableArena& GetScratchArena() noexcept { return GetCurrentWorker().scratch; }
 
 		//for stats
 		uint64_t GetCurrentCreatedJobs() const noexcept;
@@ -78,11 +79,13 @@ namespace rr
 		void ExecuteJob(Job* job);
 		void FinishJob(Job* job);
 
-
+	private:
+		bool IsMainThread() const noexcept;
+		Worker& GetCurrentWorker() noexcept;
+		Worker& GetWorker(size_t index) noexcept { return workers_[index]; }
 		void WakeOneWorker();
 		size_t GetTotalWorkerCount() const noexcept { return workers_.size(); }
 		size_t GetBackgroundWorkerCount() const noexcept { return workers_.size() - 1; }
-		void CheckMainThreadOnly() const noexcept;
 
 	private:
 		template<JobFnNoPayload Fn>
@@ -118,7 +121,7 @@ namespace rr
 		job->system_ = this;
 		job->execute_ = [](Job* ctx, void*)
 			{
-				Fn(ctx);
+				std::invoke(Fn, ctx);
 			};
 
 		return job;
@@ -143,13 +146,13 @@ namespace rr
 		Job* const job = AllocateJob();
 		job->system_ = this;
 
-		job->payload_ = tls_self_->arena.New<Payload>(std::forward<Args>(args)...);
+		job->payload_ = GetCurrentWorker().arena.New<Payload>(std::forward<Args>(args)...);
 		RR_ASSERT(job->payload_ != nullptr);
 
 		job->execute_ = [](Job* ctx, void* data)
 			{
 				auto& payload = *static_cast<Payload*>(data);
-				std::apply([&](auto&... xs) { Fn(ctx, xs...); }, payload);
+				std::apply([&](auto&... xs) { std::invoke(Fn, ctx, xs...); }, payload);
 			};
 
 		return job;
@@ -159,7 +162,7 @@ namespace rr
 	template<auto Fn, typename... Args>
 	inline Job* JobSystem::CreateJob(Args&&... args)
 	{
-		CheckMainThreadOnly();
+		RR_ASSERT(IsMainThread());
 		if constexpr (sizeof...(Args) == 0)
 		{
 			return CreateJobNoPayloadImpl<Fn>();

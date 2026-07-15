@@ -42,7 +42,7 @@ namespace rr
 
 	public:
 		size_t GetArenaMaxSize() const noexcept { return arena_.ReservedSize(); }
-		size_t GetUsedBytes() const noexcept { return arena_.UsedSize(); }
+		size_t GetUsedSize() const noexcept { return arena_.UsedSize(); }
 
 	private:
 		StableArena arena_;

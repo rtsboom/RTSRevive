@@ -1,4 +1,5 @@
 #include "pch.h"
+#include <Engine/ModelAsset.h>
 #include <Engine/StableArena.h>
 
 #include <TinyGLTFv3/tiny_gltf_v3.h>
@@ -16,42 +17,6 @@ namespace
 
 namespace rr
 {
-	struct Material;
-	struct MeshPrimitive;
-	struct Mesh;
-	struct SceneNode;
-	struct AnimationClip;
-
-	struct Model
-	{
-		std::span<std::byte>	 vmem; // gpu upload buffer directly
-		std::span<Material>		 materials;
-		std::span<MeshPrimitive> primitives;
-		std::span<Mesh>			 meshes;
-		std::span<SceneNode>	 nodes;
-		std::span<AnimationClip> animations;
-	};
-
-	struct MeshPrimitive
-	{
-		struct ByteSpan { uint32_t offset_bytes, size_bytes; };
-		ByteSpan indices;
-		uint32_t index_stride;
-
-		// position stride is always 12B (float3)
-		ByteSpan positions;
-
-		// UV stride is always 4B (half2)
-		ByteSpan uv0s;
-
-		// normal stride is always 4B (R8G8B8A8_SNORM)
-		ByteSpan normals;
-
-		// tangent stride is always 4B (R8G8B8A8_SNORM)
-		ByteSpan tangents;
-
-		uint32_t material;
-	};
 
 
 }
