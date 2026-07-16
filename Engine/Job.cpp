@@ -18,9 +18,4 @@ namespace rr
 
 		next_ = job;
 	}
-
-	StableArena& Job::GetScratchArena()
-	{
-		return system_->GetScratchArena();
-	}
 }

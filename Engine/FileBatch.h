@@ -34,7 +34,7 @@ namespace rr
 			FileBlob* current = first_;
 			while (current)
 			{
-				fn(*current);
+				std::invoke(fn, *current);
 				current = current->next;
 			}
 		}

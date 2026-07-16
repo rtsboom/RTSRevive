@@ -37,7 +37,6 @@ namespace rr
 
 		void Run(Job* job);
 		void SetNext(Job* job);
-		StableArena& GetScratchArena();
 	};
 
 	static_assert(std::is_trivially_destructible_v<Job>);

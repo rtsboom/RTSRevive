@@ -2,6 +2,7 @@
 #include <sal.h>
 #include <Windows.h>
 #include <Engine/Asserts.h>
+#include <Engine/TempAllocator.h>
 
 int RunGame(HINSTANCE hInstance, int nCmdShow);
 

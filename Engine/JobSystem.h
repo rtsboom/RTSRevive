@@ -18,11 +18,9 @@ namespace rr
 	class JobSystem
 	{
 		static constexpr size_t kWorkerArenaSize = 4 * 1024 * 1024; // 4MB
-		static constexpr size_t kScratchArenaSize = 128 * 1024; // 128KB
 		struct alignas(64) Worker
 		{
 			StableArena arena{ kWorkerArenaSize };
-			StableArena scratch{ kScratchArenaSize };
 			WorkStealingQueue<Job*, 1024> queue;
 			uint64_t rng_state{ 0 };
 
@@ -58,7 +56,6 @@ namespace rr
 		bool IsFinished(Job* job) const noexcept;
 		void Reset();
 
-		StableArena& GetScratchArena() noexcept { return GetCurrentWorker().scratch; }
 
 		//for stats
 		uint64_t GetCurrentCreatedJobs() const noexcept;

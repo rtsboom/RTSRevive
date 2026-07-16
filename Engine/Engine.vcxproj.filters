@@ -97,6 +97,9 @@
     <ClInclude Include="ModelPipeline.h">
       <Filter>Asset</Filter>
     </ClInclude>
+    <ClInclude Include="TempAllocator.h">
+      <Filter>Core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="GPU">

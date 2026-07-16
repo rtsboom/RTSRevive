@@ -43,11 +43,12 @@ namespace rr
 			if (ProcessOneJob())
 				continue;
 
-			// pair with WakeOneWorker()
+			// pair with WakeOneWorker() seq_cst fence
 			sleeping_worker_mask_.fetch_or(current_worker_mask, std::memory_order_seq_cst);
 
 			if (ProcessOneJob() || !running_.load(std::memory_order_acquire))
 			{
+				// double check if a job is available.
 				sleeping_worker_mask_.fetch_and(~current_worker_mask, std::memory_order_relaxed);
 				continue;
 			}
@@ -200,7 +201,6 @@ namespace rr
 
 		++GetCurrentWorker().executed_jobs;
 
-		GetScratchArena().Rewind();
 		job->Execute();
 
 		// IMPORTANT:
