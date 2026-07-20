@@ -53,7 +53,7 @@ namespace rr
 
 		void RunJob(Job* job);
 		void WaitJob(Job* job);
-		bool IsFinished(Job* job) const noexcept;
+		bool IsFinished(Job const* job) const noexcept;
 		void Reset();
 
 

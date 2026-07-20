@@ -8,6 +8,7 @@ namespace rr
 {
 	void Job::Run(Job* job)
 	{
+		RR_ASSERT(system_ != nullptr);
 		system_->RunJob(job);
 	}
 
@@ -18,4 +19,9 @@ namespace rr
 
 		next_ = job;
 	}
+    bool Job::IsFinished() const noexcept
+    {
+		RR_ASSERT(system_ != nullptr);
+        return system_->IsFinished(this);
+    }
 }

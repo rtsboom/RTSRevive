@@ -37,6 +37,7 @@ namespace rr
 
 		void Run(Job* job);
 		void SetNext(Job* job);
+		bool IsFinished() const noexcept;
 	};
 
 	static_assert(std::is_trivially_destructible_v<Job>);

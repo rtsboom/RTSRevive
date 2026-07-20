@@ -43,6 +43,9 @@
     <ClCompile Include="Job.cpp">
       <Filter>Job</Filter>
     </ClCompile>
+    <ClCompile Include="FileUtils.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SimpleEvent.h" />
@@ -94,11 +97,23 @@
     <ClInclude Include="ModelAsset.h">
       <Filter>Asset</Filter>
     </ClInclude>
-    <ClInclude Include="ModelPipeline.h">
-      <Filter>Asset</Filter>
-    </ClInclude>
     <ClInclude Include="TempAllocator.h">
       <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="FileUtils.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene.h">
+      <Filter>Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="ScenePackage.h">
+      <Filter>Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetPool.h">
+      <Filter>Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="Material.h">
+      <Filter>Asset</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -64,13 +64,11 @@ namespace rr
 
 	struct Material
 	{
-		int base_color_texture{ -1 };
-		int metallic_roughness_texture{ -1 };
-		int normal_texture{ -1 };
-		int occlusion_texture{ -1 };
+		int base_color{ -1 };
+		int metallic_roughness{ -1 };
+		int normal{ -1 };
 
 		float base_color_factor[4]{ 1.0f, 1.0f, 1.0f, 1.0f };
-		float emissive_factor[3]{ 0.0f, 0.0f, 0.0f };
 		float metallic_factor{ 0.0f };
 		float roughness_factor{ 1.0f };
 	};

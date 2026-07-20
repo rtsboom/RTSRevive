@@ -1,8 +1,9 @@
 #pragma once
 #include <Engine/StableArena.h>
 #include <cstddef>
-#include <string_view>
+#include <type_traits>
 #include <filesystem>
+#include <string_view>
 #include <span>
 namespace rr
 {
@@ -41,8 +42,8 @@ namespace rr
 
 
 	public:
-		size_t GetArenaMaxSize() const noexcept { return arena_.ReservedSize(); }
-		size_t GetUsedSize() const noexcept { return arena_.UsedSize(); }
+		size_t MaxSize() const noexcept { return arena_.ReservedSize(); }
+		size_t UsedSize() const noexcept { return arena_.UsedSize(); }
 
 	private:
 		StableArena arena_;

@@ -260,7 +260,7 @@ namespace rr
 		}
 	}
 
-	bool JobSystem::IsFinished(Job* job) const noexcept
+	bool JobSystem::IsFinished(Job const* job) const noexcept
 	{
 		RR_ASSERT(job);
 		return job->unfinished_.load(std::memory_order_acquire) == 0;

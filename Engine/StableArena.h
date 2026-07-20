@@ -28,6 +28,7 @@ namespace rr
 
 
 	public:
+		std::byte* Data() const noexcept { return data_; }
 		size_t ReservedSize() const noexcept { return reserved_bytes_; }
 		size_t CommittedSize() const noexcept { return committed_bytes_; }
 		size_t UsedSize() const noexcept { return used_bytes_; }
