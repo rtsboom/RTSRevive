@@ -49,14 +49,24 @@ namespace rr
 
 			RR_ASSERT((old & current_worker_bit) == 0);
 
-			if (ProcessOneJob() || !running_.load(std::memory_order_acquire))
+			// double check if the job system is still running before sleeping.
+			if (!running_.load(std::memory_order_acquire))
 			{
-				// double check if a job is available.
+				break;
+			}
+
+			// double check if a job is available before sleeping.
+			if (ProcessOneJob())
+			{
 				auto const old = sleeping_worker_mask_.fetch_and(
 					~current_worker_bit, std::memory_order_relaxed);
 
-				if ((old & current_worker_bit) != 0) // cancel sleeping
-					continue;
+				// consume the semaphore token
+				// when a waker already claimed the bit and released the semaphore.
+				if ((old & current_worker_bit) == 0) 
+					GetCurrentWorker().wake_smph.acquire();
+
+				continue; // cancel sleeping
 			}
 
 			// sleep
@@ -92,11 +102,13 @@ namespace rr
 	{
 		running_.store(false, std::memory_order_release);
 		std::atomic_thread_fence(std::memory_order_seq_cst);
+
 		auto mask = sleeping_worker_mask_.exchange(0ull, std::memory_order_relaxed);
 		while (mask != 0)
 		{
 			size_t const index = std::countr_zero(mask);
-			mask &= mask - 1;
+			mask &= mask - 1; // clear lowest set bit
+
 			workers_[index].wake_smph.release();
 		}
 
