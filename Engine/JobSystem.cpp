@@ -36,7 +36,7 @@ namespace rr
 	{
 		tls_system = this;
 		tls_worker_index = index;
-		uint64_t const current_worker_mask = 1ull << index;
+		uint64_t const current_worker_bit = 1ull << index;
 
 		while (running_.load(std::memory_order_acquire))
 		{
@@ -44,13 +44,19 @@ namespace rr
 				continue;
 
 			// pair with WakeOneWorker() seq_cst fence
-			sleeping_worker_mask_.fetch_or(current_worker_mask, std::memory_order_seq_cst);
+			auto const old = sleeping_worker_mask_.fetch_or(
+				current_worker_bit, std::memory_order_seq_cst);
+
+			RR_ASSERT((old & current_worker_bit) == 0);
 
 			if (ProcessOneJob() || !running_.load(std::memory_order_acquire))
 			{
 				// double check if a job is available.
-				sleeping_worker_mask_.fetch_and(~current_worker_mask, std::memory_order_relaxed);
-				continue;
+				auto const old = sleeping_worker_mask_.fetch_and(
+					~current_worker_bit, std::memory_order_relaxed);
+
+				if ((old & current_worker_bit) != 0) // cancel sleeping
+					continue;
 			}
 
 			// sleep
@@ -74,7 +80,7 @@ namespace rr
 		}
 
 		running_.store(true, std::memory_order_release);
-		
+
 		// worker index 0 is the main thread.
 		for (size_t i{ 1 }; i < GetBackgroundWorkerCount(); ++i)
 		{
@@ -85,13 +91,13 @@ namespace rr
 	void JobSystem::Shutdown()
 	{
 		running_.store(false, std::memory_order_release);
-
-		uint64_t mask = sleeping_worker_mask_.exchange(0ull, std::memory_order_acq_rel);
-
-
-		for (size_t i{}; i < GetBackgroundWorkerCount(); ++i)
+		std::atomic_thread_fence(std::memory_order_seq_cst);
+		auto mask = sleeping_worker_mask_.exchange(0ull, std::memory_order_relaxed);
+		while (mask != 0)
 		{
-			workers_[i].wake_smph.release();
+			size_t const index = std::countr_zero(mask);
+			mask &= mask - 1;
+			workers_[index].wake_smph.release();
 		}
 
 		for (auto& worker : workers_)
@@ -242,7 +248,7 @@ namespace rr
 		RR_ASSERT(job != nullptr);
 		++GetCurrentWorker().submitted_jobs;
 
-		RR_CHECK_MSG(PushJob(job), 
+		RR_CHECK_MSG(PushJob(job),
 			"Job queue is full. Consider increasing kWorkStealingQueueSize.");
 
 
@@ -303,10 +309,10 @@ namespace rr
 	{
 		RR_ASSERT(IsMainThread() || tls_system == this);
 
-		return workers_[tls_worker_index]; 
+		return workers_[tls_worker_index];
 	}
 
-    void JobSystem::WakeOneWorker()
+	void JobSystem::WakeOneWorker()
 	{
 		std::atomic_thread_fence(std::memory_order_seq_cst);
 		uint64_t mask = sleeping_worker_mask_.load(std::memory_order_relaxed);
@@ -314,11 +320,11 @@ namespace rr
 		while (mask != 0)
 		{
 			int const i = std::countr_zero(mask);
-			uint64_t const target_mask = 1ull << i;
+			uint64_t const target_bit = 1ull << i;
 
 			if (sleeping_worker_mask_.compare_exchange_weak(
 				mask,
-				mask & ~target_mask,
+				mask & ~target_bit,
 				std::memory_order_relaxed,
 				std::memory_order_relaxed))
 			{
