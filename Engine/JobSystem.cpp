@@ -43,7 +43,7 @@ namespace rr
 			if (ProcessOneJob())
 				continue;
 
-			// pair with WakeOneWorker() seq_cst fence
+			// Prevent lost wakeup.
 			auto const old = sleeping_worker_mask_.fetch_or(
 				current_worker_bit, std::memory_order_seq_cst);
 
@@ -63,14 +63,13 @@ namespace rr
 
 				// consume the semaphore token
 				// when a waker already claimed the bit and released the semaphore.
-				if ((old & current_worker_bit) == 0) 
+				if ((old & current_worker_bit) == 0)
 					GetCurrentWorker().wake_smph.acquire();
-
-				continue; // cancel sleeping
 			}
-
-			// sleep
-			GetCurrentWorker().wake_smph.acquire();
+			else // no job available, go to sleep
+			{
+				GetCurrentWorker().wake_smph.acquire();
+			}
 		}
 	}
 
@@ -101,13 +100,16 @@ namespace rr
 	void JobSystem::Shutdown()
 	{
 		running_.store(false, std::memory_order_release);
+
+		// Prevent lost wakeups.
 		std::atomic_thread_fence(std::memory_order_seq_cst);
 
+		// Wake all workers that are sleeping.
 		auto mask = sleeping_worker_mask_.exchange(0ull, std::memory_order_relaxed);
 		while (mask != 0)
 		{
 			size_t const index = std::countr_zero(mask);
-			mask &= mask - 1; // clear lowest set bit
+			mask &= mask - 1; // Clear lowest set bit.
 
 			workers_[index].wake_smph.release();
 		}
@@ -207,6 +209,7 @@ namespace rr
 		if (job != nullptr)
 		{
 			ExecuteJob(job);
+			FinishJob(job);
 			return true;
 		}
 
@@ -216,17 +219,9 @@ namespace rr
 	void JobSystem::ExecuteJob(Job* job)
 	{
 		RR_ASSERT(job->system_ == this);
-
-		++GetCurrentWorker().executed_jobs;
-
 		job->Execute();
 
-		// IMPORTANT:
-		// FinishJob() must be the last step of job execution.
-		// WaitJob() may return immediately after Finish() completes the root job, so
-		// no observable side effects should occur after this call.
-
-		FinishJob(job);
+		++GetCurrentWorker().executed_jobs;
 	}
 
 	void JobSystem::FinishJob(Job* job)
@@ -238,20 +233,24 @@ namespace rr
 			job->unfinished_.fetch_sub(1, std::memory_order_acq_rel) - 1;
 
 		RR_ASSERT(unfinished >= 0);
+		if (unfinished > 0)
+			return;
 
-		if (unfinished == 0)
+		Job* const parent = job->parent;
+		Job* const next = job->next_;
+
+		++GetCurrentWorker().finished_jobs;
+		if (parent != nullptr)
 		{
-			Job* const next_ = job->next_;
-			Job* const parent = job->parent;
-
-			if (next_ != nullptr)
-				RunJob(job->next_);
-
-			if (parent != nullptr)
-				FinishJob(job->parent);
-
-			++GetCurrentWorker().finished_jobs;
+			FinishJob(job->parent);
 		}
+		else
+		{
+			finished_root_job_count_.fetch_add(1, std::memory_order_release);
+		}
+
+		if (next != nullptr)
+			RunJob(job->next_);
 	}
 
 
@@ -277,14 +276,36 @@ namespace rr
 		}
 	}
 
+	void JobSystem::WaitUntilIdle()
+	{
+		RR_ASSERT(IsMainThread());
+		while (!IsIdle())
+		{
+			ProcessOneJob();
+		}
+	}
+
 	bool JobSystem::IsFinished(Job const* job) const noexcept
 	{
 		RR_ASSERT(job);
 		return job->unfinished_.load(std::memory_order_acquire) == 0;
 	}
 
+	bool JobSystem::IsIdle() const noexcept
+	{
+		RR_ASSERT(IsMainThread());
+
+		auto const finished = finished_root_job_count_.load(std::memory_order_acquire);
+		RR_ASSERT(created_root_job_count_ >= finished);
+
+		return created_root_job_count_ == finished;
+	}
+
 	void JobSystem::Reset()
 	{
+		RR_ASSERT(IsMainThread());
+		RR_CHECK(IsIdle());
+
 		auto const created_jobs = GetCurrentCreatedJobs();
 		auto const submitted_jobs = GetCurrentSubmittedJobs();
 		auto const executed_jobs = GetCurrentExecutedJobs();
@@ -292,10 +313,7 @@ namespace rr
 
 		RR_CHECK(created_jobs == submitted_jobs);
 		RR_CHECK(submitted_jobs == executed_jobs);
-
-		// finished_jobs is a debug-only statistic.
-		// WaitJob() returns when Job::unfinished_ reaches zero, before finished_jobs is updated.
-		// Do not use finished_jobs for Reset() consistency checks.
+		RR_CHECK(executed_jobs == finished_jobs);
 
 		for (auto& worker : workers_)
 		{
@@ -310,6 +328,9 @@ namespace rr
 		total_submitted_jobs_ += submitted_jobs;
 		total_executed_jobs_ += executed_jobs;
 		total_finished_jobs_ += finished_jobs;
+
+		created_root_job_count_ = 0;
+		finished_root_job_count_.store(0, std::memory_order_relaxed);
 	}
 
 	bool JobSystem::IsMainThread() const noexcept

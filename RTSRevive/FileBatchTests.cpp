@@ -143,7 +143,7 @@ namespace
 
 		Job* root = job_system.CreateJob<FileBatchTestJob>(&batch);
 		job_system.RunJob(root);
-		job_system.WaitJob(root);
+		job_system.WaitUntilIdle();
 		job_system.Reset();
 
 		RR_CHECK(job_system.GetTotalExecutedJobs() == count + 1);

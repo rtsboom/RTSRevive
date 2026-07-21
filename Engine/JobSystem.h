@@ -54,7 +54,9 @@ namespace rr
 
 		void RunJob(Job* job);
 		void WaitJob(Job* job);
+		void WaitUntilIdle();
 		bool IsFinished(Job const* job) const noexcept;
+		bool IsIdle() const noexcept;
 		void Reset();
 
 
@@ -81,6 +83,7 @@ namespace rr
 		bool IsMainThread() const noexcept;
 		Worker& GetCurrentWorker() noexcept;
 		Worker& GetWorker(size_t index) noexcept { return workers_[index]; }
+		Worker const& GetMainWorker() const noexcept { return workers_[0]; }
 		void WakeOneWorker();
 		size_t GetTotalWorkerCount() const noexcept { return workers_.size(); }
 		size_t GetBackgroundWorkerCount() const noexcept { return workers_.size() - 1; }
@@ -110,6 +113,9 @@ namespace rr
 		uint64_t total_submitted_jobs_{ 0 };
 		uint64_t total_executed_jobs_{ 0 };
 		uint64_t total_finished_jobs_{ 0 };
+
+		uint64_t created_root_job_count_{ 0 };
+		std::atomic_uint64_t finished_root_job_count_{ 0 };
 	};
 
 	template<JobFnNoPayload Fn>
@@ -161,14 +167,20 @@ namespace rr
 	inline Job* JobSystem::CreateJob(Args&&... args)
 	{
 		RR_ASSERT(IsMainThread());
+
+		Job* job{ nullptr };
 		if constexpr (sizeof...(Args) == 0)
 		{
-			return CreateJobNoPayloadImpl<Fn>();
+			job = CreateJobNoPayloadImpl<Fn>();
 		}
 		else
 		{
-			return CreateJobImpl<Fn>(std::forward<Args>(args)...);
+			job = CreateJobImpl<Fn>(std::forward<Args>(args)...);
 		}
+
+		++created_root_job_count_;
+		return job;
+
 	}
 
 	template<auto Fn, typename ...Args>
@@ -177,7 +189,7 @@ namespace rr
 		RR_ASSERT(parent);
 		parent->unfinished_.fetch_add(1, std::memory_order_relaxed);
 
-		Job* job;
+		Job* job{ nullptr };
 		if constexpr (sizeof...(Args) == 0)
 		{
 			job = CreateJobNoPayloadImpl<Fn>();

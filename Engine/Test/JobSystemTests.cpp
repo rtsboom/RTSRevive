@@ -153,9 +153,10 @@ namespace
 			}
 
 			js.RunJob(root);
-			js.WaitJob(root);
-
-			RR_ASSERT(counter.load(std::memory_order_relaxed) == job_count + 1);
+			//js.WaitJob(root);
+			js.WaitUntilIdle();
+			auto const result = counter.load(std::memory_order_relaxed);
+			RR_ASSERT(result == job_count + 1);
 			js.Reset();
 		}
 

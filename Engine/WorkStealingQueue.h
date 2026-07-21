@@ -110,6 +110,14 @@ namespace rr
 			return result;
 		}
 
+		// Only call from the owner thread
+		bool IsEmpty() const noexcept
+		{
+			uint64_t const b = bottom_.load(std::memory_order_relaxed);
+			uint64_t const t = top_.load(std::memory_order_acquire);
+			return (b - t) == 0;
+		}
+
 	private:
 		alignas(64) std::atomic_uint64_t top_{ 0 }; // thief side
 		alignas(64) std::atomic_uint64_t bottom_{ 0 }; // owner side
