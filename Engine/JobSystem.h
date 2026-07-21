@@ -17,11 +17,12 @@ namespace rr
 {
 	class JobSystem
 	{
+		static constexpr size_t kWorkStealingQueueSize = 1024;
 		static constexpr size_t kWorkerArenaSize = 4 * 1024 * 1024; // 4MB
 		struct alignas(64) Worker
 		{
 			StableArena arena{ kWorkerArenaSize };
-			WorkStealingQueue<Job*, 1024> queue;
+			WorkStealingQueue<Job*, kWorkStealingQueueSize> queue;
 			uint64_t rng_state{ 0 };
 
 			//for stats

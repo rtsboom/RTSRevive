@@ -54,7 +54,7 @@ namespace
 		JobSystem js;
 		js.Initialize(4);
 
-		constexpr int job_count = 10'000;
+		constexpr int job_count = 1023;
 		std::atomic<int> counter = 0;
 
 		Job* root = js.CreateJob<CounterJob>(&counter);
@@ -104,7 +104,7 @@ namespace
 			JobSystem js;
 			js.Initialize(worker_count);
 
-			constexpr int job_count = 30'000; // Max 2^15
+			constexpr int job_count = 1023;
 			std::atomic<int> counter = 0;
 
 			Job* root = js.CreateJob<CounterJob>(&counter);
@@ -123,7 +123,7 @@ namespace
 			js.RunJob(root);
 			js.WaitJob(root);
 
-			assert(counter.load(std::memory_order_relaxed) == job_count + 1);
+			RR_ASSERT(counter.load(std::memory_order_relaxed) == job_count + 1);
 
 			js.Shutdown();
 		}

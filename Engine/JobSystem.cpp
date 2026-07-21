@@ -242,10 +242,9 @@ namespace rr
 		RR_ASSERT(job != nullptr);
 		++GetCurrentWorker().submitted_jobs;
 
-		while (!PushJob(job)) // if queue is full
-		{
-			ProcessOneJob();
-		}
+		RR_CHECK_MSG(PushJob(job), 
+			"Job queue is full. Consider increasing kWorkStealingQueueSize.");
+
 
 		WakeOneWorker();
 	}
@@ -309,7 +308,6 @@ namespace rr
 
     void JobSystem::WakeOneWorker()
 	{
-		// Prevent Store-Load reordering (PushJob -> Load) 
 		std::atomic_thread_fence(std::memory_order_seq_cst);
 		uint64_t mask = sleeping_worker_mask_.load(std::memory_order_relaxed);
 

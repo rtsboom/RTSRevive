@@ -49,7 +49,7 @@ namespace
 
 		RR_CHECK(batch.AddFile(test_file_path));
 		batch.Clear();
-		RR_CHECK(batch.GetUsedSize() == 0);
+		RR_CHECK(batch.UsedSize() == 0);
 	}
 
 	void AddMultipleFiles()
@@ -76,7 +76,7 @@ namespace
 			result = batch.AddFile(test_file_path);
 		}
 		RR_CHECK(!result);
-		RR_CHECK(batch.GetUsedSize() < batch.GetArenaMaxSize());
+		RR_CHECK(batch.UsedSize() < batch.MaxSize());
 	}
 
 	void ParseWithTinyGLTFv3()
