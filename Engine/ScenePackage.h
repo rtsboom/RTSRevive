@@ -1,13 +1,12 @@
 #pragma once
 #include <Engine/StableArena.h>
 #include <Engine/Material.h>
+#include <Engine/Geometry.h>
 #include <Engine/Scene.h>
-#include <cstdint>
 #include <string_view>
+#include <cstdint>
 namespace rr
 {
-	struct Mesh;
-	struct Primitive;
 	struct ScenePackage
 	{
 		static constexpr size_t kArenaSize = 32 * 1024 * 1024; // 32MB
@@ -28,9 +27,6 @@ namespace rr
 
 		Sampler* samplers{ nullptr };
 		int      sampler_count{ 0 };
-
-		Texture* textures{ nullptr };
-		int      texture_count{ 0 };
 
 		std::string_view base_dir{};
 		Image* images{ nullptr };

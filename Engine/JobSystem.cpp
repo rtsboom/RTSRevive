@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <cassert>
 #include <memory>
-#include <Windows.h>
 #include <atomic>
 #include <bit>
 #include <vector>

@@ -94,9 +94,6 @@
     <ClInclude Include="Timer.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="ModelAsset.h">
-      <Filter>Asset</Filter>
-    </ClInclude>
     <ClInclude Include="TempAllocator.h">
       <Filter>Core</Filter>
     </ClInclude>
@@ -113,6 +110,9 @@
       <Filter>Asset</Filter>
     </ClInclude>
     <ClInclude Include="Material.h">
+      <Filter>Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="Geometry.h">
       <Filter>Asset</Filter>
     </ClInclude>
   </ItemGroup>

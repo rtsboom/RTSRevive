@@ -164,8 +164,8 @@
     <ClInclude Include="Asserts.h" />
     <ClInclude Include="AssetPool.h" />
     <ClInclude Include="FileUtils.h" />
+    <ClInclude Include="Geometry.h" />
     <ClInclude Include="Material.h" />
-    <ClInclude Include="ModelAsset.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="StableArray.h" />
     <ClInclude Include="GPUBumpBuffer.h" />
